@@ -1,0 +1,34 @@
+# Virtual environments
+.venv/
+venv/
+.rag/venv/
+
+# RAG data
+.rag/data/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Project archive
+.claude-project/archive/
+
+# Temp
+temp/
+
+# MCP config (local paths)
+.mcp.json
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# Environment
+.env
+
+# SQLite (except project.db)
+*.db
+!.claude-project/project.db
