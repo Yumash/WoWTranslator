@@ -139,6 +139,21 @@ class TranslationPipeline:
         self._config.translation_enabled = value
         logger.info("Translation %s", "enabled" if value else "disabled")
 
+    def update_config(self, config: PipelineConfig) -> None:
+        """Hot-update pipeline settings without restart.
+
+        Updates detector language, target language, enabled channels, etc.
+        Called from the main thread when user saves settings.
+        """
+        old_own = self._config.own_language
+        old_target = self._config.target_lang
+        self._config = config
+        self._detector.own_language = config.own_language
+        if old_own != config.own_language:
+            logger.info("Own language changed: %s -> %s", old_own, config.own_language)
+        if old_target != config.target_lang:
+            logger.info("Target language changed: %s -> %s", old_target, config.target_lang)
+
     def load_history(self, max_lines: int = 50) -> list[TranslatedMessage]:
         """Read last N lines from the log and parse them (no translation)."""
         lines = self._watcher.read_tail(max_lines)

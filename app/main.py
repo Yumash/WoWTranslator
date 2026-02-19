@@ -25,6 +25,10 @@ from app.tray import TrayIcon
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("wct_app.log", encoding="utf-8", mode="w"),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -70,6 +74,11 @@ class PipelineThread(QThread):
             self._pipeline.stop()
         self.quit()
         self.wait(5000)
+
+    def update_config(self, config: PipelineConfig) -> None:
+        """Forward config update to the pipeline (thread-safe)."""
+        if self._pipeline:
+            self._pipeline.update_config(config)
 
     @property
     def pipeline(self) -> TranslationPipeline | None:
@@ -175,6 +184,9 @@ def main() -> int:
             config = dialog.get_config()
             overlay.update_channel_filters(_enabled_filter_names(config))
             overlay.apply_settings(config)
+            # Propagate language/channel settings to the pipeline thread
+            new_pipeline_config = _build_pipeline_config(config)
+            pipeline_thread.update_config(new_pipeline_config)
 
     tray.settings_requested.connect(open_settings)
     overlay.settings_requested.connect(open_settings)

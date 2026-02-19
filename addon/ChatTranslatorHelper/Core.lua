@@ -1,5 +1,6 @@
--- ChatTranslatorHelper: auto-enable chat logging for WoWTranslator companion app
--- Minimal addon. All translation logic is in the companion app.
+-- ChatTranslatorHelper: capture chat for WoWTranslator companion app
+-- Reads ChatFrame scrollback via GetMessageInfo() — no taint issues.
+-- All translation logic is in the companion app.
 
 local ADDON_NAME = "ChatTranslatorHelper"
 local frame = CreateFrame("Frame")
@@ -11,8 +12,29 @@ ChatTranslatorHelperDB = ChatTranslatorHelperDB or {
     flushInterval = 5,  -- seconds between LoggingChat toggle flushes
 }
 
+-- Pre-allocate ALL table keys on load to prevent hash table resize.
+-- The companion app locates the hash Node for "wctbuf" once, then reads
+-- its pointer every 500ms (O(1)).  If the table resizes (new keys added),
+-- the Node array is reallocated and the companion loses the pointer.
+-- So we ensure every possible key exists from the start.
+local function PreallocateKeys()
+    local db = ChatTranslatorHelperDB
+    if db.wctbuf == nil then db.wctbuf = "" end
+    if db._r1 == nil then db._r1 = 0 end
+    if db._r2 == nil then db._r2 = 0 end
+    if db._r3 == nil then db._r3 = 0 end
+end
+PreallocateKeys()
+
 -- Flush timer handle
 local flushTicker = nil
+
+-- ── Memory Buffer for Companion App ──────────────────────────
+-- Ring buffer read by companion via ReadProcessMemory.
+-- Format: SEQ|RAW|formatted_chat_line
+local MSG_LIMIT = 50  -- ring buffer size
+local wctBuf = {}      -- accumulator table
+local wctSeq = 0       -- monotonic sequence counter
 
 local function Print(msg)
     if ChatTranslatorHelperDB.verbose then
@@ -42,7 +64,116 @@ local function StopFlushTimer()
     end
 end
 
--- Enable logging + flush timer (called from both login and /reload)
+local bufDirty = false
+
+local function RebuildBuffer()
+    ChatTranslatorHelperDB.wctbuf = "__WCT_BUF__" .. table.concat(wctBuf, "\n") .. "\n__WCT_END__"
+    bufDirty = false
+end
+
+local function AddEntry(entry)
+    tinsert(wctBuf, entry)
+    while #wctBuf > MSG_LIMIT do
+        tremove(wctBuf, 1)
+    end
+    bufDirty = true
+end
+
+-- Flush dirty buffer to SavedVariables string periodically.
+-- Each RebuildBuffer() creates a NEW Lua string at a NEW memory address
+-- (Lua strings are immutable).  The companion caches the memory region
+-- and rescans it on stale (~50-200ms), so moderate flush interval is fine.
+local FLUSH_INTERVAL = 2  -- 2s — gives companion stable address between rescans
+C_Timer.NewTicker(FLUSH_INTERVAL, function()
+    if bufDirty then
+        RebuildBuffer()
+    end
+end)
+
+-- ── ChatFrame Scrollback Polling ──────────────────────────────
+-- Instead of hooking AddMessage (which doesn't fire for player chat
+-- in TWW 12.0 due to secure C++ path), we poll the ChatFrame's
+-- scrollback buffer using GetNumMessages() / GetMessageInfo().
+-- This reads already-rendered text — no taint issues.
+-- Used by BasicChatMods, Prat, and other chat addons in TWW.
+
+local POLL_INTERVAL = 0.2  -- 200ms between polls
+local pollTicker = nil
+
+-- Track how many messages we've seen per ChatFrame
+local frameMessageCount = {}  -- frameIndex -> last known GetNumMessages()
+
+-- Dedup: same message text may appear in multiple ChatFrames (tabs)
+-- Store last 100 cleaned texts to avoid duplicate entries
+local recentTexts = {}  -- text -> true
+local recentTextsList = {}  -- ordered list for eviction
+local DEDUP_LIMIT = 100
+
+local function StripMarkup(text)
+    if not text then return "" end
+    local s = text
+    s = s:gsub("|c%x%x%x%x%x%x%x%x", "")
+    s = s:gsub("|r", "")
+    s = s:gsub("|T.-|t", "")
+    s = s:gsub("|A.-|a", "")
+    return strtrim(s)
+end
+
+local function PollChatFrames()
+    for i = 1, NUM_CHAT_WINDOWS do
+        local cf = _G["ChatFrame" .. i]
+        if cf and cf:IsVisible() then
+            local ok, numMsgs = pcall(cf.GetNumMessages, cf)
+            if ok and numMsgs then
+                local lastSeen = frameMessageCount[i] or 0
+
+                -- On first poll, skip existing messages (only capture new ones)
+                if lastSeen == 0 then
+                    frameMessageCount[i] = numMsgs
+                elseif numMsgs > lastSeen then
+                    -- Read new messages (indices are 1-based, newest = numMsgs)
+                    for idx = lastSeen + 1, numMsgs do
+                        local ok2, text = pcall(cf.GetMessageInfo, cf, idx)
+                        if ok2 and text and text ~= "" then
+                            local clean = StripMarkup(text)
+                            if clean and clean ~= "" and not recentTexts[clean] then
+                                -- Dedup: mark as seen
+                                recentTexts[clean] = true
+                                tinsert(recentTextsList, clean)
+                                while #recentTextsList > DEDUP_LIMIT do
+                                    local old = tremove(recentTextsList, 1)
+                                    recentTexts[old] = nil
+                                end
+
+                                wctSeq = wctSeq + 1
+                                AddEntry(wctSeq .. "|RAW|" .. clean)
+                            end
+                        end
+                    end
+                    frameMessageCount[i] = numMsgs
+                elseif numMsgs < lastSeen then
+                    -- Buffer was cleared (unlikely but handle it)
+                    frameMessageCount[i] = numMsgs
+                end
+            end
+        end
+    end
+end
+
+local function StartPollTimer()
+    if pollTicker then return end
+    pollTicker = C_Timer.NewTicker(POLL_INTERVAL, PollChatFrames)
+    Print("ChatFrame poll every " .. (POLL_INTERVAL * 1000) .. "ms enabled.")
+end
+
+local function StopPollTimer()
+    if pollTicker then
+        pollTicker:Cancel()
+        pollTicker = nil
+    end
+end
+
+-- Enable logging + flush timer + poll (called from both login and /reload)
 local function EnableLoggingAndFlush()
     if not ChatTranslatorHelperDB.autoLog then
         Print("Auto-logging disabled. Use /wct log on to enable.")
@@ -62,6 +193,9 @@ local function EnableLoggingAndFlush()
         ChatTranslatorHelperDB.wctbuf = "__WCT_BUF__\n__WCT_END__"
         Print("Memory buffer initialized for companion app.")
     end
+
+    -- Start polling ChatFrame scrollback for new messages
+    StartPollTimer()
 end
 
 -- Init on ADDON_LOADED (fires on both login and /reload)
@@ -94,8 +228,19 @@ SlashCmdList["WCT"] = function(msg)
         Print("  Chat logging: " .. (logging and "|cFF40FF40ON|r" or "|cFFFF4040OFF|r"))
         Print("  Auto-log on login: " .. (ChatTranslatorHelperDB.autoLog and "ON" or "OFF"))
         Print("  Flush timer: " .. (flushTicker and ("|cFF40FF40ON|r (" .. ChatTranslatorHelperDB.flushInterval .. "s)") or "|cFFFF4040OFF|r"))
+        Print("  Poll timer: " .. (pollTicker and "|cFF40FF40ON|r" or "|cFFFF4040OFF|r"))
         Print("  Memory buffer: " .. #wctBuf .. "/" .. MSG_LIMIT .. " msgs (seq " .. wctSeq .. ")")
-        Print("  Use: /wct log|auto|verbose|flush|buf on|off, /wct flush <seconds>")
+        -- Show tracked frame counts
+        local frames = ""
+        for i = 1, NUM_CHAT_WINDOWS do
+            local cf = _G["ChatFrame" .. i]
+            if cf and cf:IsVisible() then
+                local c = frameMessageCount[i] or 0
+                frames = frames .. " CF" .. i .. "=" .. c
+            end
+        end
+        Print("  Tracked:" .. frames)
+        Print("  Use: /wct log|auto|verbose|flush|buf|poll on|off")
 
     elseif cmd == "log on" then
         LoggingChat(true)
@@ -140,6 +285,13 @@ SlashCmdList["WCT"] = function(msg)
             Print("Interval must be 1-60 seconds.")
         end
 
+    elseif cmd == "poll on" then
+        StartPollTimer()
+
+    elseif cmd == "poll off" then
+        StopPollTimer()
+        Print("Poll timer |cFFFF4040disabled|r.")
+
     elseif cmd == "buf" then
         Print("Memory buffer:")
         Print("  Messages: " .. #wctBuf .. "/" .. MSG_LIMIT)
@@ -148,99 +300,8 @@ SlashCmdList["WCT"] = function(msg)
         Print("  Buffer size: " .. bufLen .. " bytes")
 
     else
-        Print("Unknown command. Use: /wct [status|log|auto|verbose|flush|buf] [on|off|<seconds>]")
+        Print("Unknown command. Use: /wct [status|log|auto|verbose|flush|buf|poll] [on|off|<seconds>]")
     end
 end
 
--- ── Memory Buffer for Companion App ──────────────────────────
--- The companion app reads this string from WoW's process memory
--- via ReadProcessMemory. The unique markers __WCT_BUF__ and
--- __WCT_END__ allow the companion to locate the buffer.
---
--- Format: __WCT_BUF__<lines>__WCT_END__
--- Each line: SEQ|RAW|formatted_chat_line
---
--- WoW TWW marks CHAT_MSG_* event args as "secret" (tainted).
--- Even ChatFrame_AddMessageEventFilter receives tainted strings.
--- The ONLY safe path: hook ChatFrame:AddMessage() which receives
--- the final formatted (and fully detainted) display string.
--- The companion app parses channel/author/text from this string
--- (same format as WoWChatLog.txt lines).
-
-local MSG_LIMIT = 50  -- ring buffer size
-local wctBuf = {}      -- accumulator table
-local wctSeq = 0       -- monotonic sequence counter
-
--- Strip WoW visual markup but KEEP hyperlink structure for parsing.
--- Removes: colors |cXXXXXXXX / |r, textures |T..|t, atlas |A..|a
--- Keeps: |Hchannel:TYPE|h[Name]|h and |Hplayer:Name|h[Name]|h
--- so the companion app can parse channel/author from hyperlinks.
-local function StripMarkup(text)
-    if not text then return "" end
-    local s = text
-    -- Remove |cXXXXXXXX (color start)
-    s = s:gsub("|c%x%x%x%x%x%x%x%x", "")
-    -- Remove |r (color end)
-    s = s:gsub("|r", "")
-    -- Remove texture escapes |T...|t
-    s = s:gsub("|T.-|t", "")
-    -- Remove atlas |A.-|a
-    s = s:gsub("|A.-|a", "")
-    -- Remove |K (BN name replacement) and |k
-    s = s:gsub("|K.-|k", "")
-    return strtrim(s)
-end
-
-local function RebuildBuffer()
-    -- Rebuild contiguous string with markers for ReadProcessMemory
-    ChatTranslatorHelperDB.wctbuf = "__WCT_BUF__" .. table.concat(wctBuf, "\n") .. "\n__WCT_END__"
-end
-
--- Hook AddMessage on all chat frames to capture formatted lines.
--- Uses hooksecurefunc so we run AFTER the original, preserving
--- WoW's secure/taint execution path (no "secret string" errors).
-local function HookChatFrame(cf)
-    if not cf or cf._wctHooked then return end
-    if not cf.AddMessage then return end
-
-    hooksecurefunc(cf, "AddMessage", function(self, text, r, g, b, ...)
-        -- pcall so any error in our code never breaks WoW chat
-        pcall(function()
-            if not text or text == "" then return end
-
-            -- Strip color codes for clean text
-            local clean = StripMarkup(text)
-            if not clean or clean == "" then return end
-
-            wctSeq = wctSeq + 1
-            local entry = wctSeq .. "|RAW|" .. clean
-            tinsert(wctBuf, entry)
-
-            while #wctBuf > MSG_LIMIT do
-                tremove(wctBuf, 1)
-            end
-
-            RebuildBuffer()
-        end)
-    end)
-    cf._wctHooked = true
-end
-
--- Hook default chat frames (1-10)
-for i = 1, 10 do
-    local cf = _G["ChatFrame" .. i]
-    if cf then
-        HookChatFrame(cf)
-    end
-end
--- Also hook any temporary chat frames created later
-hooksecurefunc("FCF_OpenTemporaryWindow", function(...)
-    for i = 1, NUM_CHAT_WINDOWS do
-        local cf = _G["ChatFrame" .. i]
-        if cf and not cf._wctHooked then
-            HookChatFrame(cf)
-        end
-    end
-end)
-
-Print("Chat frame hooks active for companion app.")
+Print("Scrollback polling active.")
