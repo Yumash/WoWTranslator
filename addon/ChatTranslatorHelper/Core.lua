@@ -123,39 +123,47 @@ local function PollChatFrames()
     for i = 1, NUM_CHAT_WINDOWS do
         local cf = _G["ChatFrame" .. i]
         if cf and cf:IsVisible() then
-            local ok, numMsgs = pcall(cf.GetNumMessages, cf)
-            if ok and numMsgs then
+            -- Wrap per-frame processing in pcall: In TWW 12.0, chat
+            -- messages inside instances are "Secret Values".  Direct
+            -- comparison (==, ~=, <, >) on secrets raises a Lua error,
+            -- but concatenation and string.format WORK with secrets.
+            -- So we avoid ALL comparisons on text and just concatenate
+            -- it straight into the buffer entry.  The companion app
+            -- handles StripMarkup + dedup + empty-check on its side.
+            pcall(function()
+                local numMsgs = cf:GetNumMessages()
                 local lastSeen = frameMessageCount[i] or 0
 
-                -- On first poll, skip existing messages (only capture new ones)
                 if lastSeen == 0 then
                     frameMessageCount[i] = numMsgs
                 elseif numMsgs > lastSeen then
-                    -- Read new messages (indices are 1-based, newest = numMsgs)
                     for idx = lastSeen + 1, numMsgs do
-                        local ok2, text = pcall(cf.GetMessageInfo, cf, idx)
-                        if ok2 and text and text ~= "" then
-                            local clean = StripMarkup(text)
-                            if clean and clean ~= "" and not recentTexts[clean] then
-                                -- Dedup: mark as seen
-                                recentTexts[clean] = true
-                                tinsert(recentTextsList, clean)
-                                while #recentTextsList > DEDUP_LIMIT do
-                                    local old = tremove(recentTextsList, 1)
-                                    recentTexts[old] = nil
+                        pcall(function()
+                            local text = cf:GetMessageInfo(idx)
+                            if text then
+                                -- NO comparisons on text (secret value).
+                                -- Concat is allowed for secrets — use it to
+                                -- build a dedup key.  The result of concat is
+                                -- a new regular string, safe to compare/index.
+                                local key = "K" .. text
+                                if not recentTexts[key] then
+                                    recentTexts[key] = true
+                                    tinsert(recentTextsList, key)
+                                    while #recentTextsList > DEDUP_LIMIT do
+                                        local old = tremove(recentTextsList, 1)
+                                        recentTexts[old] = nil
+                                    end
+                                    wctSeq = wctSeq + 1
+                                    AddEntry(wctSeq .. "|RAW|" .. text)
                                 end
-
-                                wctSeq = wctSeq + 1
-                                AddEntry(wctSeq .. "|RAW|" .. clean)
                             end
-                        end
+                        end)
                     end
                     frameMessageCount[i] = numMsgs
                 elseif numMsgs < lastSeen then
-                    -- Buffer was cleared (unlikely but handle it)
                     frameMessageCount[i] = numMsgs
                 end
-            end
+            end)
         end
     end
 end

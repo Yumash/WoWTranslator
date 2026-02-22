@@ -1,5 +1,19 @@
 # Changelog / История изменений
 
+## [1.0.2] — 2026-02-22
+
+### Fixed / Исправлено
+- Addon: fixed taint error "attempt to compare secret string" in TWW — Secret Values from GetMessageInfo are now concatenated (allowed) instead of compared (forbidden); double pcall contains taint per-frame and per-message
+- Addon: removed StripMarkup on addon side — raw text with WoW markup sent to companion, companion parser handles markup stripping
+- Pipeline: unmapped lingua languages (e.g. Tswana for "okay alr") now fall through to DeepL auto-detect instead of being skipped
+
+### Added / Добавлено
+- Slang normalizer: gaming slang expanded to plain English before DeepL (summ→summon, bio→break, rezz→resurrect, pls→please, etc.) — dramatically improves translation of short chat messages
+- DeepL context parameter: "World of Warcraft raid group chat" hint (free, not billed)
+- Phrasebook: 30+ new raid abbreviations (summ, bio, rez, cds, bl, hero, brez, wipe, kick, gl guys, gg wp, etc.)
+- Version shown in overlay title bar
+- "About" tab in settings with developer info, GitHub link, and donate addresses
+
 ## [1.0.1] — 2026-02-22
 
 ### Fixed / Исправлено

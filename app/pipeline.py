@@ -17,6 +17,7 @@ from app.detector import ChatLanguageDetector
 from app.parser import Channel, ChatMessage, parse_line
 from app.phrasebook import lookup as phrasebook_lookup
 from app.phrasebook import lookup_abbreviation as phrasebook_abbrev
+from app.slang import expand_slang
 from app.text_utils import (
     clean_message_text,
     is_empty_or_whitespace,
@@ -272,10 +273,17 @@ class TranslationPipeline:
         else:
             source_lang = _LINGUA_TO_DEEPL.get(detected, "")
             if not source_lang:
-                logger.info("Skip (unmapped lang %s): %r", detected, cleaned_text[:60])
-                self._on_message(TranslatedMessage(original=msg, translation=None))
-                return
-            logger.info("Translating %s→%s: %r", source_lang, target_lang, cleaned_text[:60])
+                # Lingua detected a language not in DeepL map — let DeepL
+                # auto-detect instead of skipping.
+                logger.info(
+                    "Translating (auto-detect, lingua=%s)→%s: %r",
+                    detected, target_lang, cleaned_text[:60],
+                )
+            else:
+                logger.info(
+                    "Translating %s→%s: %r",
+                    source_lang, target_lang, cleaned_text[:60],
+                )
 
         # Check phrasebook (instant, no API call)
         phrasebook_hit = phrasebook_lookup(cleaned_text, source_lang, target_lang)
@@ -306,12 +314,19 @@ class TranslationPipeline:
         # Strip URLs, WoW markers before translation
         text_to_translate, replacements = strip_for_translation(cleaned_text)
 
+        # Expand gaming slang to plain English so DeepL can understand
+        expanded = expand_slang(text_to_translate)
+        if expanded != text_to_translate:
+            logger.info("Slang expanded: %r → %r", text_to_translate[:60], expanded[:60])
+            text_to_translate = expanded
+
         # Translate via API (this blocks — called from watchdog thread)
         src_display = source_lang or "auto"
         logger.info("Calling DeepL: %s→%s %r", src_display, target_lang, text_to_translate[:60])
         result = self._translator.translate(
             text_to_translate, target_lang=target_lang,
             source_lang=source_lang or None,
+            context="World of Warcraft multiplayer game raid group chat",
         )
         translated_preview = result.translated[:60] if result.translated else ""
         logger.info("DeepL result: success=%s, translated=%r", result.success, translated_preview)

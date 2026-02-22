@@ -303,6 +303,110 @@ _abbrev("sum pls", {
 _abbrev("sum", {
     "RU": "саммон", "EN": "summon",
     "DE": "Beschwörung", "FR": "invocation", "ES": "invocar"})
+_abbrev("summ", {
+    "RU": "саммон", "EN": "summon",
+    "DE": "Beschwörung", "FR": "invocation", "ES": "invocar"})
+_abbrev("summ pls", {
+    "RU": "саммон пожалуйста", "EN": "summon please",
+    "DE": "Beschwörung bitte", "FR": "invocation svp",
+    "ES": "invocar por favor"})
+_abbrev("summ all pls", {
+    "RU": "саммон всех пожалуйста", "EN": "summon all please",
+    "DE": "alle beschwören bitte", "FR": "invocation tous svp",
+    "ES": "invocar a todos por favor"})
+_abbrev("sum all pls", {
+    "RU": "саммон всех пожалуйста", "EN": "summon all please",
+    "DE": "alle beschwören bitte", "FR": "invocation tous svp",
+    "ES": "invocar a todos por favor"})
+
+# Raid / instance coordination
+_abbrev("bio", {
+    "RU": "перерыв", "EN": "bio break",
+    "DE": "Bio-Pause", "FR": "pause bio", "ES": "pausa bio"})
+_abbrev("bio break", {
+    "RU": "перерыв", "EN": "bio break",
+    "DE": "Bio-Pause", "FR": "pause bio", "ES": "pausa bio"})
+_abbrev("sec bio", {
+    "RU": "секунду, перерыв", "EN": "sec, bio break",
+    "DE": "Sekunde, Bio-Pause", "FR": "seconde, pause bio",
+    "ES": "segundo, pausa bio"})
+_abbrev("30 sec bio", {
+    "RU": "30 секунд перерыв", "EN": "30 sec bio break",
+    "DE": "30 Sek Bio-Pause", "FR": "30 sec pause bio",
+    "ES": "30 seg pausa bio"})
+_abbrev("2 min bio", {
+    "RU": "2 минуты перерыв", "EN": "2 min bio break",
+    "DE": "2 Min Bio-Pause", "FR": "2 min pause bio",
+    "ES": "2 min pausa bio"})
+_abbrev("5 min bio", {
+    "RU": "5 минут перерыв", "EN": "5 min bio break",
+    "DE": "5 Min Bio-Pause", "FR": "5 min pause bio",
+    "ES": "5 min pausa bio"})
+_abbrev("on last", {
+    "RU": "на последнем боссе", "EN": "on last boss",
+    "DE": "beim letzten Boss", "FR": "au dernier boss",
+    "ES": "en el último jefe"})
+_abbrev("wipe", {
+    "RU": "вайп", "EN": "wipe",
+    "DE": "Wipe", "FR": "wipe", "ES": "wipe"})
+_abbrev("lust", {
+    "RU": "героизм", "EN": "bloodlust",
+    "DE": "Kampfrausch", "FR": "furie sanguinaire",
+    "ES": "ansia de sangre"})
+_abbrev("bl", {
+    "RU": "героизм", "EN": "bloodlust",
+    "DE": "Kampfrausch", "FR": "furie sanguinaire",
+    "ES": "ansia de sangre"})
+_abbrev("hero", {
+    "RU": "героизм", "EN": "heroism",
+    "DE": "Heldentum", "FR": "héroïsme", "ES": "heroísmo"})
+_abbrev("brez", {
+    "RU": "боевой рез", "EN": "battle rez",
+    "DE": "Kampfrez", "FR": "rez combat", "ES": "rez combate"})
+_abbrev("rez", {
+    "RU": "воскрешение", "EN": "resurrect",
+    "DE": "Wiederbelebung", "FR": "résurrection", "ES": "resurrección"})
+_abbrev("rezz", {
+    "RU": "воскрешение", "EN": "resurrect",
+    "DE": "Wiederbelebung", "FR": "résurrection", "ES": "resurrección"})
+_abbrev("rezz pls", {
+    "RU": "воскресите пожалуйста", "EN": "rez please",
+    "DE": "Rez bitte", "FR": "rez svp", "ES": "rez por favor"})
+_abbrev("rez pls", {
+    "RU": "воскресите пожалуйста", "EN": "rez please",
+    "DE": "Rez bitte", "FR": "rez svp", "ES": "rez por favor"})
+_abbrev("cds", {
+    "RU": "кулдауны", "EN": "cooldowns",
+    "DE": "Abklingzeiten", "FR": "cooldowns", "ES": "cooldowns"})
+_abbrev("pop cds", {
+    "RU": "юзайте кулдауны", "EN": "pop cooldowns",
+    "DE": "CDs nutzen", "FR": "pop les CDs", "ES": "usar CDs"})
+_abbrev("kick", {
+    "RU": "сбейте каст", "EN": "interrupt",
+    "DE": "unterbrechen", "FR": "interrompre", "ES": "interrumpir"})
+_abbrev("int", {
+    "RU": "сбейте каст", "EN": "interrupt",
+    "DE": "unterbrechen", "FR": "interrompre", "ES": "interrumpir"})
+_abbrev("gl guys", {
+    "RU": "удачи, ребята", "EN": "good luck guys",
+    "DE": "viel Glück Leute", "FR": "bonne chance les gars",
+    "ES": "buena suerte chicos"})
+_abbrev("gl all", {
+    "RU": "всем удачи", "EN": "good luck all",
+    "DE": "allen viel Glück", "FR": "bonne chance à tous",
+    "ES": "buena suerte a todos"})
+_abbrev("gl hf", {
+    "RU": "удачи, весёлой игры", "EN": "good luck, have fun",
+    "DE": "viel Glück und Spaß", "FR": "bonne chance, amusez-vous",
+    "ES": "buena suerte, diviértanse"})
+_abbrev("gg wp", {
+    "RU": "хорошая игра, молодцы", "EN": "good game, well played",
+    "DE": "gutes Spiel, gut gespielt",
+    "FR": "bien joué", "ES": "buen juego, bien jugado"})
+_abbrev("gotta go", {
+    "RU": "мне пора", "EN": "gotta go",
+    "DE": "muss los", "FR": "je dois y aller",
+    "ES": "me tengo que ir"})
 
 # fmt: on
 # ---------------------------------------------------------------------------

@@ -57,6 +57,7 @@ class TranslatorService:
         text: str,
         target_lang: str,
         source_lang: str | None = None,
+        context: str | None = None,
     ) -> TranslationResult:
         """Translate text to target language.
 
@@ -64,6 +65,8 @@ class TranslatorService:
             text: Text to translate.
             target_lang: Target language code (e.g. "EN", "RU", "DE").
             source_lang: Source language code. None for auto-detect.
+            context: Extra context to improve translation (not translated,
+                     not billed).  E.g. "World of Warcraft raid chat".
 
         Returns:
             TranslationResult with translated text or original on error.
@@ -84,6 +87,7 @@ class TranslatorService:
                     text,
                     target_lang=effective_target,
                     source_lang=source_lang,
+                    context=context,
                 )
                 return TranslationResult(
                     original=text,
