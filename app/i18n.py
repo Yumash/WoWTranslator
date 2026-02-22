@@ -347,6 +347,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         "RU": "Перевод ВКЛ по умолчанию",
         "EN": "Translation ON by default",
     },
+    "settings.overlay.show_console": {
+        "RU": "Показывать окно отладки (консоль)",
+        "EN": "Show debug console",
+    },
 
     # Hotkeys tab
     "settings.hk_group": {"RU": "Горячие клавиши", "EN": "Hotkeys"},
@@ -431,11 +435,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "EN": "Real-time WoW chat translator",
     },
     "about.developer": {"RU": "Разработчик:", "EN": "Developer:"},
-    "about.license": {"RU": "Лицензия: GPL-3.0", "EN": "License: GPL-3.0"},
-    "about.guild_credit": {
-        "RU": "\u2694 Сделано с любовью и поддержкой лучшей гильдии WoW",
-        "EN": "\u2694 Made with love and support of the best WoW guild",
-    },
+    "about.license": {"RU": "Лицензия: Apache-2.0", "EN": "License: Apache-2.0"},
     "about.close": {"RU": "Закрыть", "EN": "Close"},
     "overlay.session_start": {"RU": "новая сессия", "EN": "new session"},
 }

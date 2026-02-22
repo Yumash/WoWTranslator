@@ -211,6 +211,27 @@ def _strip_wow_markup(text: str) -> str:
     return re.sub(r"\|c[0-9a-fA-F]{8}|\|r|\|H[^|]*\|h|\|h", "", text)
 
 
+# Full WoW hyperlink pattern: |cXXXXXXXX|Htype:data|h[Display Name]|h|r
+_RE_WOW_LINK = re.compile(r"\|c[0-9a-fA-F]{8}\|H[^|]+\|h\[[^\]]*\]\|h\|r")
+
+
+def _is_item_link_only(raw_text: str) -> bool:
+    """Return True if raw text consists entirely of WoW item/spell links (no real words)."""
+    stripped = _RE_WOW_LINK.sub("", raw_text).strip()
+    return len(stripped) == 0 and _RE_WOW_LINK.search(raw_text) is not None
+
+
+def _clean_text(raw_text: str) -> str | None:
+    """Strip WoW markup and filter out item-link-only / system messages. Returns None to skip."""
+    raw = raw_text.strip()
+    if _is_item_link_only(raw):
+        return None
+    text = _strip_wow_markup(raw)
+    if _is_system_message(text):
+        return None
+    return text
+
+
 def parse_line(line: str) -> ChatMessage | None:
     """Parse a single WoW Chat Log line into a ChatMessage.
 
@@ -221,8 +242,8 @@ def parse_line(line: str) -> ChatMessage | None:
     for regex in (_RE_WHISPER_TO, _RE_WHISPER_TO_RU):
         m = regex.match(line)
         if m:
-            text = _strip_wow_markup(m.group(4).strip())
-            if _is_system_message(text):
+            text = _clean_text(m.group(4))
+            if text is None:
                 return None
             return ChatMessage(
                 timestamp=m.group(1),
@@ -235,8 +256,8 @@ def parse_line(line: str) -> ChatMessage | None:
     # Try whisper FROM (English: "whispers:", Russian: "шепчет:")
     m = _RE_WHISPER_FROM.match(line)
     if m:
-        text = _strip_wow_markup(m.group(4).strip())
-        if _is_system_message(text):
+        text = _clean_text(m.group(4))
+        if text is None:
             return None
         return ChatMessage(
             timestamp=m.group(1),
@@ -254,8 +275,8 @@ def parse_line(line: str) -> ChatMessage | None:
         if channel is None:
             return None
 
-        text = _strip_wow_markup(m.group(5).strip())
-        if _is_system_message(text):
+        text = _clean_text(m.group(5))
+        if text is None:
             return None
         return ChatMessage(
             timestamp=m.group(1),
@@ -273,8 +294,8 @@ def parse_line(line: str) -> ChatMessage | None:
         if channel is None:
             return None  # Unknown channel (e.g., numbered channels, trade, etc.)
 
-        text = _strip_wow_markup(m.group(5).strip())
-        if _is_system_message(text):
+        text = _clean_text(m.group(5))
+        if text is None:
             return None
         return ChatMessage(
             timestamp=m.group(1),
@@ -287,8 +308,8 @@ def parse_line(line: str) -> ChatMessage | None:
     # Try AddMessage whisper formats (Вы шепчете / You whisper)
     m = _RE_WHISPER_TO_ADDMSG.match(line)
     if m:
-        text = _strip_wow_markup(m.group(4).strip())
-        if _is_system_message(text):
+        text = _clean_text(m.group(4))
+        if text is None:
             return None
         return ChatMessage(
             timestamp=m.group(1),
@@ -300,8 +321,8 @@ def parse_line(line: str) -> ChatMessage | None:
 
     m = _RE_WHISPER_FROM_ADDMSG.match(line)
     if m:
-        text = _strip_wow_markup(m.group(4).strip())
-        if _is_system_message(text):
+        text = _clean_text(m.group(4))
+        if text is None:
             return None
         return ChatMessage(
             timestamp=m.group(1),
@@ -317,8 +338,8 @@ def parse_line(line: str) -> ChatMessage | None:
         verb = m.group(4).lower()
         channel = _SAY_YELL_VERB_MAP.get(verb)
         if channel:
-            text = _strip_wow_markup(m.group(5).strip())
-            if not _is_system_message(text):
+            text = _clean_text(m.group(5))
+            if text is not None:
                 return ChatMessage(
                     timestamp=m.group(1),
                     channel=channel,
@@ -333,8 +354,8 @@ def parse_line(line: str) -> ChatMessage | None:
         verb = m.group(3).lower()
         channel = _SAY_YELL_VERB_MAP.get(verb)
         if channel:
-            text = _strip_wow_markup(m.group(4).strip())
-            if not _is_system_message(text):
+            text = _clean_text(m.group(4))
+            if text is not None:
                 # Author may have spaces (NPC names); no server
                 return ChatMessage(
                     timestamp=m.group(1),
@@ -398,8 +419,8 @@ def parse_addon_line(line: str) -> tuple[ChatMessage | None, int]:
     else:
         author, server = author_full, ""
 
-    text = _strip_wow_markup(text.strip())
-    if _is_system_message(text):
+    text = _clean_text(text)
+    if text is None:
         return None, seq
 
     t = time.localtime()

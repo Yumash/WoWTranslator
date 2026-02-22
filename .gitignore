@@ -22,7 +22,9 @@ temp/
 config.json
 overlay_settings.json
 settings_dialog_pos.json
-debug.log
+
+# Logs
+*.log
 
 # Downloaded addons (research)
 AutoChatLog/
@@ -33,7 +35,6 @@ AutoChatLog/
 # Build artifacts
 build/
 dist/
-*.spec
 
 # Environment
 .env

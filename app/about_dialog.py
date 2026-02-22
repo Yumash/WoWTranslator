@@ -136,31 +136,6 @@ class AboutDialog(QDialog):
         license_label.setStyleSheet("color: #999; font-size: 11px;")
         layout.addWidget(license_label)
 
-        # Guild credits
-        guild_sep = QLabel()
-        guild_sep.setFixedHeight(1)
-        guild_sep.setStyleSheet("background: #444;")
-        layout.addWidget(guild_sep)
-
-        guild_label = QLabel(
-            '<span style="color: #FFD200; font-size: 12px;">'
-            f'{tr("about.guild_credit")}</span>'
-        )
-        guild_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(guild_label)
-
-        guild_name = QLabel(
-            '<a href="https://t.me/RetroKettle_WoW" '
-            'style="color: #40FF40; font-size: 16px; font-weight: bold; '
-            'text-decoration: none;">'
-            "\u2615 Retro-Kettles / "
-            "\u0420\u0435\u0442\u0440\u043e-\u0427\u0430\u0439\u043d\u0438\u043a\u0438"
-            "</a>"
-        )
-        guild_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        guild_name.setOpenExternalLinks(True)
-        layout.addWidget(guild_name)
-
         # Links
         links_sep = QLabel()
         links_sep.setFixedHeight(1)

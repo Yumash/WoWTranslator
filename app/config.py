@@ -65,6 +65,9 @@ class AppConfig:
     # Translation
     translation_enabled_default: bool = True
 
+    # Debug
+    show_debug_console: bool = False
+
     def save(self, path: str = CONFIG_FILE) -> None:
         """Save config to JSON file."""
         Path(path).write_text(

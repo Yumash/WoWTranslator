@@ -83,7 +83,7 @@ end
 -- Each RebuildBuffer() creates a NEW Lua string at a NEW memory address
 -- (Lua strings are immutable).  The companion caches the memory region
 -- and rescans it on stale (~50-200ms), so moderate flush interval is fine.
-local FLUSH_INTERVAL = 2  -- 2s — gives companion stable address between rescans
+local FLUSH_INTERVAL = 1.5  -- 1.5s — companion rescans every 2s, so keep fresh
 C_Timer.NewTicker(FLUSH_INTERVAL, function()
     if bufDirty then
         RebuildBuffer()

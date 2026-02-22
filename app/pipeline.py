@@ -261,6 +261,7 @@ class TranslationPipeline:
         detected = self._detector.detect(cleaned_text)
         if detected is None:
             # Own language or undetectable — emit without translation
+            logger.debug("No translation: own lang or undetectable for %r", cleaned_text[:60])
             self._on_message(TranslatedMessage(original=msg, translation=None))
             return
 

@@ -6,7 +6,7 @@ import logging
 from collections.abc import Callable
 
 from PyQt6.QtCore import QPoint, QRunnable, Qt, QThreadPool, QTimer, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QColor, QCursor, QFont, QPainter, QPen, QTextCharFormat, QTextCursor
+from PyQt6.QtGui import QColor, QCursor, QFont, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
-    QSizeGrip,
     QSlider,
     QTextEdit,
     QVBoxLayout,
@@ -371,13 +370,17 @@ class ChatOverlay(QWidget):
         self._reply_input.returnPressed.connect(self._do_reply_translate)
         input_row.addWidget(self._reply_input)
 
-        # Enter hint
-        enter_hint = QLabel("\u23CE")
-        enter_hint.setFixedSize(20, 24)
-        enter_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        enter_hint.setStyleSheet("color: #555; font-size: 14px; background: transparent;")
-        enter_hint.setToolTip("Enter")
-        input_row.addWidget(enter_hint)
+        # Enter button
+        enter_btn = QPushButton("\u23CE")
+        enter_btn.setFixedSize(24, 24)
+        enter_btn.setStyleSheet(
+            "QPushButton { color: #555; font-size: 14px; background: transparent; "
+            "border: 1px solid transparent; border-radius: 3px; }"
+            "QPushButton:hover { color: #FFD200; border-color: #FFD200; }"
+        )
+        enter_btn.setToolTip("Enter")
+        enter_btn.clicked.connect(self._do_reply_translate)
+        input_row.addWidget(enter_btn)
 
         # Language selector combobox
         self._reply_lang_combo = QComboBox()
@@ -458,7 +461,7 @@ class ChatOverlay(QWidget):
         self._resize_grip.setStyleSheet(
             "color: #555; font-size: 12px; background: transparent;"
         )
-        self._resize_grip.setToolTip(tr("overlay.resize_hint") if "overlay.resize_hint" in dir(tr) else "Resize")
+        self._resize_grip.setToolTip("Resize")
         grip_row.addWidget(self._resize_grip)
         container_layout.addLayout(grip_row)
 

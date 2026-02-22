@@ -683,6 +683,10 @@ class SettingsDialog(QDialog):
         self._translate_default.setChecked(self._config.translation_enabled_default)
         behavior_layout.addWidget(self._translate_default)
 
+        self._show_console = QCheckBox(tr("settings.overlay.show_console"))
+        self._show_console.setChecked(self._config.show_debug_console)
+        behavior_layout.addWidget(self._show_console)
+
         layout.addWidget(behavior_group)
         layout.addStretch()
         return tab
@@ -776,6 +780,7 @@ class SettingsDialog(QDialog):
         self._config.overlay_opacity = self._opacity_slider.value()
         self._config.overlay_font_size = self._font_size.value()
         self._config.translation_enabled_default = self._translate_default.isChecked()
+        self._config.show_debug_console = self._show_console.isChecked()
         self._config.hotkey_toggle_translate = self._hk_toggle.text()
         self._config.hotkey_clipboard_translate = self._hk_clipboard.text()
         # Apply UI language change

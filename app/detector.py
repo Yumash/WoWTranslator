@@ -22,6 +22,25 @@ _SKIP_PHRASES = frozenset({
 
 MIN_TEXT_LENGTH = 3
 
+# Short text uses a more lenient detection threshold
+_SHORT_TEXT_THRESHOLD = 20
+
+# Cyrillic fallback: if lingua can't decide but text is mostly Cyrillic,
+# assume Russian (the dominant Cyrillic language in WoW).
+_CYRILLIC_THRESHOLD = 0.5
+
+
+def _cyrillic_ratio(text: str) -> float:
+    """Return fraction of alphabetic characters that are Cyrillic."""
+    alpha_count = 0
+    cyrillic_count = 0
+    for ch in text:
+        if ch.isalpha():
+            alpha_count += 1
+            if "\u0400" <= ch <= "\u04ff":
+                cyrillic_count += 1
+    return cyrillic_count / alpha_count if alpha_count > 0 else 0.0
+
 
 class ChatLanguageDetector:
     """Detects language of chat messages, skipping gaming jargon."""
@@ -31,6 +50,12 @@ class ChatLanguageDetector:
         self._detector = (
             LanguageDetectorBuilder.from_all_languages()
             .with_minimum_relative_distance(0.25)
+            .build()
+        )
+        # Lenient detector for short text — lower confidence threshold
+        self._detector_lenient = (
+            LanguageDetectorBuilder.from_all_languages()
+            .with_minimum_relative_distance(0.1)
             .build()
         )
 
@@ -48,7 +73,7 @@ class ChatLanguageDetector:
         Returns None if:
         - text is too short
         - text is a known gaming phrase
-        - confidence is too low
+        - confidence is too low (with Cyrillic fallback)
         - detected language matches own_language
         """
         cleaned = text.strip().lower()
@@ -59,7 +84,24 @@ class ChatLanguageDetector:
         if cleaned in _SKIP_PHRASES:
             return None
 
-        detected = self._detector.detect_language_of(text)
+        # Use lenient detector for short text
+        if len(cleaned) <= _SHORT_TEXT_THRESHOLD:
+            detected = self._detector_lenient.detect_language_of(text)
+        else:
+            detected = self._detector.detect_language_of(text)
+
+        # Cyrillic fallback: if lingua can't decide but text is predominantly
+        # Cyrillic, assume Russian. This helps with short slang like "мда",
+        # "щяс", "хуй там" that lingua fails to classify.
+        if detected is None:
+            ratio = _cyrillic_ratio(text)
+            if ratio >= _CYRILLIC_THRESHOLD:
+                detected = Language.RUSSIAN
+                logger.debug(
+                    "Cyrillic fallback: %.0f%% → RUSSIAN for %r",
+                    ratio * 100, text[:40],
+                )
+
         if detected is None:
             return None
 

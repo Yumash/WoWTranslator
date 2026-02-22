@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import logging
 import signal
 import sys
@@ -132,6 +133,24 @@ def _enabled_filter_names(config: AppConfig) -> set[str]:
     return names
 
 
+def _setup_console(visible: bool) -> None:
+    """Show or hide a debug console window (Windows only).
+
+    When the .exe is built with console=False (windowed mode), there is no
+    console by default.  AllocConsole() creates one on demand and we redirect
+    stdout/stderr so that logging output appears there.
+    """
+    kernel32 = ctypes.windll.kernel32
+    if visible:
+        kernel32.AllocConsole()
+        # Redirect Python stdout/stderr to the new console
+        sys.stdout = open("CONOUT$", "w", encoding="utf-8")  # noqa: SIM115
+        sys.stderr = open("CONOUT$", "w", encoding="utf-8")  # noqa: SIM115
+    hwnd = kernel32.GetConsoleWindow()
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, 1 if visible else 0)
+
+
 def main() -> int:
     load_dotenv()
 
@@ -140,6 +159,10 @@ def main() -> int:
 
     # Load config
     config = AppConfig.load()
+
+    # Debug console: hidden by default, show if configured
+    if config.show_debug_console:
+        _setup_console(visible=True)
 
     # Set UI language from config
     tr.set_language(config.ui_language)

@@ -1,18 +1,18 @@
 """Read WoW chat messages from addon's in-memory buffer string.
 
-Architecture (Region-Cached Marker Scan):
+Architecture (Region-Cached Marker Scan with History):
     The addon stores chat messages in ChatTranslatorHelperDB.wctbuf as a Lua
     string with __WCT_BUF__/__WCT_END__ markers. Lua strings are immutable —
     every RebuildBuffer() creates a NEW string at a NEW address. The old string
     lingers until GC collects it.
 
-    Strategy:
-    1. First scan: pymem.pattern_scan_all → find marker address
-    2. Cache the memory REGION (via VirtualQueryEx) where the marker lives
-    3. On stale marker: scan only the cached region + neighbors (~50-200ms)
-    4. Full rescan only if region cache misses
+    Strategy (tiered scan cascade):
+    1. History scan: check regions where markers were previously found (~30ms)
+    2. Heap scan: all ≤8MB regions (~2.5s)
+    3. Full pymem scan: last resort (~7s)
 
-    This avoids the 3-8 second full process scan on every string reallocation.
+    Proactive rescan every 2s detects buffer relocation without waiting for
+    the old string to be GC'd.
 
 Safety: Read-only memory access. Warden does not flag external ReadProcessMemory.
 """
@@ -24,7 +24,6 @@ import ctypes
 import ctypes.wintypes
 import logging
 import re
-import struct
 import threading
 import time
 from collections.abc import Callable
@@ -38,7 +37,7 @@ MARKER_END = b"__WCT_END__"
 # Polling and retry intervals
 POLL_INTERVAL = 0.5  # 500ms between buffer reads
 ATTACH_RETRY_INTERVAL = 5.0  # seconds between WoW attach attempts
-SCAN_RETRY_INTERVAL = 3.0  # seconds between marker scan attempts
+SCAN_RETRY_INTERVAL = 2.0  # seconds between marker scan attempts (match addon flush)
 MAX_BUF_READ = 65536  # 64KB max read-ahead for the buffer
 RAW_LOG_FILE = "wct_raw.log"  # debug log of all raw AddMessage lines
 
@@ -57,8 +56,11 @@ _READABLE_PROTECT = {
     _PAGE_EXECUTE_READWRITE, _PAGE_WRITECOPY,
 }
 
-# How many neighboring regions to scan when cached region misses
-_NEIGHBOR_REGIONS = 4
+# Region history size — how many past marker regions to remember
+_REGION_HISTORY_SIZE = 16
+
+# Compiled marker pattern (reused across scans)
+_MARKER_PATTERN = re.compile(re.escape(MARKER_START))
 
 
 class _MEMORY_BASIC_INFORMATION(ctypes.Structure):
@@ -125,17 +127,59 @@ def _is_system_noise(text: str) -> bool:
         return True
     if " находит что-то " in t or " в панике пытается бежать" in t:
         return True
-    if t.startswith(("Получено:", "You receive")):
-        return True
-    return False
+    return bool(t.startswith(("Получено:", "You receive")))
+
+
+def _scan_regions_for_marker(
+    pm: object,
+    regions: list[tuple[int, int]],
+    min_seq: int = 0,
+) -> int:
+    """Scan a list of memory regions for the best (highest seq) marker.
+
+    Args:
+        pm: pymem.Pymem instance.
+        regions: list of (base, size) tuples to scan.
+        min_seq: only accept markers with max_seq > min_seq.
+
+    Returns marker address or 0.
+    """
+    best_addr = 0
+    best_seq = -1
+
+    for base, size in regions:
+        try:
+            raw = pm.read_bytes(base, size)
+        except Exception:
+            continue
+
+        for match in _MARKER_PATTERN.finditer(raw):
+            content_start = match.start()
+            remaining = len(raw) - content_start
+            chunk = raw[content_start:content_start + min(remaining, MAX_BUF_READ)]
+
+            if not chunk.startswith(MARKER_START):
+                continue
+            marker_end = chunk.find(MARKER_END, len(MARKER_START))
+            if marker_end == -1:
+                continue
+
+            content = chunk[len(MARKER_START):marker_end]
+            max_seq = _extract_max_seq(content)
+            if max_seq > best_seq and max_seq > min_seq:
+                best_seq = max_seq
+                best_addr = base + match.start()
+
+    return best_addr
 
 
 class WoWAddonBufReader:
     """Reads chat messages from the WoW addon's in-memory buffer string.
 
-    Uses region-cached marker scanning: after finding the marker once,
-    caches the memory region. On stale marker, rescans only the cached
-    region and neighbors (~50-200ms instead of 3-8s full scan).
+    Uses tiered scan cascade with region history:
+    1. History scan (~30ms) — regions where markers were previously found
+    2. Heap scan (~2.5s) — all ≤8MB regions
+    3. Full pymem scan (~7s) — last resort
     """
 
     def __init__(self, on_new_line: Callable[[str], None]) -> None:
@@ -152,14 +196,17 @@ class WoWAddonBufReader:
         self._all_regions: list[tuple[int, int]] = []  # sorted by base addr
         self._cached_region_index: int = -1  # index in _all_regions
 
+        # Region history: regions where markers were previously found.
+        # Lua tends to reuse the same heap segments, so scanning these first
+        # is much faster than scanning all regions.
+        self._region_history: list[tuple[int, int]] = []
+
         # Track consecutive stale reads to trigger rescan
         self._stale_count: int = 0
 
         # Periodic rescan: check if a newer buffer exists every N seconds.
-        # This catches "frozen" old Lua strings that are still readable
-        # but no longer updated (a newer string exists elsewhere).
         self._last_rescan: float = 0.0
-        self._rescan_interval: float = 3.0  # seconds between region rescans
+        self._rescan_interval: float = 2.0  # match addon FLUSH_INTERVAL
         self._same_addr_count: int = 0  # consecutive rescans finding same addr
 
     @property
@@ -323,157 +370,128 @@ class WoWAddonBufReader:
         return None
 
     # ------------------------------------------------------------------
-    # Marker scanning (region-cached)
+    # Region history
+    # ------------------------------------------------------------------
+
+    def _record_region_hit(self, base: int, size: int) -> None:
+        """Record a region where a marker was successfully found.
+
+        Move-to-front if already present; bounded to _REGION_HISTORY_SIZE.
+        """
+        entry = (base, size)
+        if entry in self._region_history:
+            self._region_history.remove(entry)
+        self._region_history.insert(0, entry)
+        if len(self._region_history) > _REGION_HISTORY_SIZE:
+            self._region_history.pop()
+
+    def _update_cached_region(self, addr: int) -> None:
+        """Update the cached region to the one containing addr."""
+        region_info = self._find_region_for_addr(addr)
+        if region_info:
+            base, size, idx = region_info
+            self._cached_region = (base, size)
+            self._cached_region_index = idx
+
+    def _record_hit_from_addr(self, addr: int) -> None:
+        """Record the region containing addr in history + update cache."""
+        region_info = self._find_region_for_addr(addr)
+        if region_info:
+            base, size, idx = region_info
+            self._cached_region = (base, size)
+            self._cached_region_index = idx
+            self._record_region_hit(base, size)
+
+    # ------------------------------------------------------------------
+    # Marker scanning (tiered cascade)
     # ------------------------------------------------------------------
 
     def _find_marker(self, min_seq: int = 0) -> bool:
-        """Find the __WCT_BUF__ marker, using region cache if available.
+        """Find the __WCT_BUF__ marker using tiered scan cascade.
 
         Args:
             min_seq: only accept markers with max_seq > min_seq.
-                     Used after frozen detection to skip the old, stale string.
 
-        Strategy:
-        1. If we have a cached region, scan it + neighbors first (~50-200ms)
-        2. If not found, do a full scan via pymem (~3-8s)
-        3. Cache the region where we found the marker
+        Cascade:
+        1. History scan (~30ms) — regions where markers were previously found
+        2. Heap scan (~2.5s) — all ≤8MB regions
+        3. Full pymem scan (~7s) — last resort
         """
         if not self._pm:
             return False
 
-        # Try cached region first (fast path)
-        if self._cached_region is not None:
+        # Tier 1: History scan (very fast, ~30ms)
+        if self._region_history:
             t0 = time.monotonic()
-            addr = self._scan_region_neighborhood(min_seq=min_seq)
+            addr = _scan_regions_for_marker(
+                self._pm, self._region_history, min_seq=min_seq,
+            )
             elapsed = time.monotonic() - t0
-
             if addr:
                 logger.info(
-                    "Region cache HIT: marker at 0x%X (%.0fms)",
+                    "History scan HIT: marker at 0x%X (%.0fms)",
                     addr, elapsed * 1000,
                 )
                 self._buf_addr = addr
                 self._stale_count = 0
+                self._record_hit_from_addr(addr)
+                self._maybe_skip_existing(addr)
                 return True
+            logger.info("History scan MISS (%.0fms)", elapsed * 1000)
 
+        # Tier 2: Heap scan (~2.5s)
+        self._all_regions = self._get_memory_regions()
+        t0 = time.monotonic()
+        addr = self._scan_heap_regions(min_seq=min_seq)
+        elapsed = time.monotonic() - t0
+        if addr:
             logger.info(
-                "Region cache MISS (%.0fms), refreshing regions and doing full scan",
-                elapsed * 1000,
+                "Heap scan HIT: marker at 0x%X (%.1fs)",
+                addr, elapsed,
             )
-            # Refresh region cache (process may have allocated new regions)
-            self._all_regions = self._get_memory_regions()
-            logger.info("Refreshed to %d readable memory regions", len(self._all_regions))
+            self._buf_addr = addr
+            self._stale_count = 0
+            self._record_hit_from_addr(addr)
+            self._maybe_skip_existing(addr)
+            return True
+        logger.info("Heap scan MISS (%.1fs)", elapsed)
 
-        # Full scan (slow path)
+        # Tier 3: Full pymem scan (~7s, last resort)
         t0 = time.monotonic()
         addr = self._full_marker_scan(min_seq=min_seq)
         elapsed = time.monotonic() - t0
-
         if addr:
             logger.info(
-                "Full scan: marker at 0x%X (%.1fs)",
-                addr, elapsed,
+                "Full scan: marker at 0x%X (%.1fs)", addr, elapsed,
             )
-            # Cache the region
-            region_info = self._find_region_for_addr(addr)
-            if region_info:
-                base, size, idx = region_info
-                self._cached_region = (base, size)
-                self._cached_region_index = idx
-                logger.info(
-                    "Cached region: 0x%X - 0x%X (%d KB)",
-                    base, base + size, size // 1024,
-                )
-
             self._buf_addr = addr
             self._stale_count = 0
-
-            # Skip existing buffer history on first connect
-            if self._last_seq == 0:
-                try:
-                    raw = self._pm.read_bytes(addr, MAX_BUF_READ)
-                    if raw.startswith(MARKER_START):
-                        end_idx = raw.find(MARKER_END, len(MARKER_START))
-                        if end_idx != -1:
-                            content = raw[len(MARKER_START):end_idx]
-                            max_seq = _extract_max_seq(content)
-                            if max_seq > 0:
-                                self._last_seq = max_seq
-                                logger.info("Skipping existing buffer (last_seq=%d)", max_seq)
-                except Exception:
-                    pass
-
+            self._record_hit_from_addr(addr)
+            self._maybe_skip_existing(addr)
             return True
 
-        logger.warning("Full scan: marker not found")
+        logger.warning("All scans failed: marker not found (%.1fs total)", elapsed)
         return False
 
-    def _scan_region_neighborhood(self, min_seq: int = 0) -> int:
-        """Scan cached region + neighbors for the marker.
-
-        Args:
-            min_seq: only accept markers with max_seq > min_seq.
-
-        Returns marker address or 0.
-        """
-        if not self._pm or self._cached_region_index < 0:
-            return 0
-
-        pattern = re.compile(re.escape(MARKER_START))
-
-        # Build list of regions to scan: cached + neighbors
-        scan_start = max(0, self._cached_region_index - _NEIGHBOR_REGIONS)
-        scan_end = min(len(self._all_regions), self._cached_region_index + _NEIGHBOR_REGIONS + 1)
-
-        best_addr = 0
-        best_seq = -1
-        total_scanned = 0
-
-        for i in range(scan_start, scan_end):
-            base, size = self._all_regions[i]
-            total_scanned += size
-            try:
-                raw = self._pm.read_bytes(base, size)
-            except Exception:
-                continue
-
-            for match in pattern.finditer(raw):
-                abs_addr = base + match.start()
-                content_start = match.start()
-                remaining = len(raw) - content_start
-                chunk = raw[content_start:content_start + min(remaining, MAX_BUF_READ)]
-
-                if not chunk.startswith(MARKER_START):
-                    continue
-                marker_end = chunk.find(MARKER_END, len(MARKER_START))
-                if marker_end == -1:
-                    continue
-
-                content = chunk[len(MARKER_START):marker_end]
-                max_seq = _extract_max_seq(content)
-                if max_seq > best_seq and max_seq > min_seq:
-                    best_seq = max_seq
-                    best_addr = abs_addr
-
-        if best_addr:
-            # Update cached region to where we actually found it
-            region_info = self._find_region_for_addr(best_addr)
-            if region_info:
-                base, size, idx = region_info
-                self._cached_region = (base, size)
-                self._cached_region_index = idx
-
-        logger.debug(
-            "Region scan: checked %d regions (%d KB), best_seq=%d",
-            scan_end - scan_start, total_scanned // 1024, best_seq,
-        )
-        return best_addr
+    def _maybe_skip_existing(self, addr: int) -> None:
+        """Skip existing buffer history on first connect."""
+        if self._last_seq != 0:
+            return
+        try:
+            raw = self._pm.read_bytes(addr, MAX_BUF_READ)
+            if raw.startswith(MARKER_START):
+                end_idx = raw.find(MARKER_END, len(MARKER_START))
+                if end_idx != -1:
+                    content = raw[len(MARKER_START):end_idx]
+                    max_seq = _extract_max_seq(content)
+                    if max_seq > 0:
+                        self._last_seq = max_seq
+                        logger.info("Skipping existing buffer (last_seq=%d)", max_seq)
+        except Exception:
+            pass
 
     def _full_marker_scan(self, min_seq: int = 0) -> int:
         """Full process scan for the marker via pymem.
-
-        Args:
-            min_seq: only accept markers with max_seq > min_seq.
 
         Returns the address of the best (highest seq) marker, or 0.
         """
@@ -524,27 +542,25 @@ class WoWAddonBufReader:
         return best_addr
 
     def _check_for_newer_buffer(self) -> None:
-        """Check if a newer buffer exists (new Lua string from RebuildBuffer).
+        """Proactively check if a newer buffer exists.
 
-        Strategy escalation:
-        - First 2 checks: neighborhood scan (fast, ~15ms, ±4 regions)
-        - After 2 same-addr: heap scan (broader, ~1-3s, all ≤8MB regions)
-        - After heap scan: refresh region list + heap scan
+        Strategy: history scan first (~30ms), then heap scan (~2.5s) if miss.
+        No escalation ladder — go straight to what works.
         """
-        if not self._pm or not self._all_regions:
+        if not self._pm:
             return
 
         t0 = time.monotonic()
 
-        if self._same_addr_count < 2:
-            # Fast: neighborhood only
-            new_addr = self._scan_region_neighborhood(min_seq=0)
-            scan_type = "neighborhood"
-        else:
-            # Broader: all heap regions (≤8MB each)
-            if self._same_addr_count == 2:
-                # Refresh region list — new allocations may have appeared
-                self._all_regions = self._get_memory_regions()
+        # Try history regions first
+        new_addr = 0
+        scan_type = "history"
+        if self._region_history:
+            new_addr = _scan_regions_for_marker(self._pm, self._region_history)
+
+        if not new_addr or new_addr == self._buf_addr:
+            # History missed or same addr — try heap scan
+            self._all_regions = self._get_memory_regions()
             new_addr = self._scan_heap_regions()
             scan_type = "heap"
 
@@ -558,12 +574,7 @@ class WoWAddonBufReader:
             self._buf_addr = new_addr
             self._stale_count = 0
             self._same_addr_count = 0
-            # Update cached region
-            region_info = self._find_region_for_addr(new_addr)
-            if region_info:
-                base, size, idx = region_info
-                self._cached_region = (base, size)
-                self._cached_region_index = idx
+            self._record_hit_from_addr(new_addr)
         else:
             self._same_addr_count += 1
             if self._same_addr_count <= 3 or self._same_addr_count % 10 == 0:
@@ -572,58 +583,25 @@ class WoWAddonBufReader:
                     self._same_addr_count, scan_type, elapsed * 1000,
                 )
 
-    def _scan_heap_regions(self) -> int:
+    def _scan_heap_regions(self, min_seq: int = 0) -> int:
         """Scan likely Lua heap regions for the best (highest seq) marker.
 
         Lua allocates strings in PAGE_READWRITE regions, typically 1-4MB.
         We scan only regions ≤ 8MB to avoid image/resource regions.
-        With ~4700 total regions, maybe ~500 are ≤8MB RW, totaling ~500MB.
-        This is ~4-8x faster than pymem's full scan of all memory.
 
         Returns marker address or 0.
         """
         if not self._pm:
             return 0
 
-        pattern = re.compile(re.escape(MARKER_START))
-        best_addr = 0
-        best_seq = -1
-        regions_scanned = 0
-        bytes_scanned = 0
-
-        for base, size in self._all_regions:
-            # Skip large regions — Lua heap chunks are typically ≤ 4MB
-            if size > 8 * 1024 * 1024:
-                continue
-            regions_scanned += 1
-            bytes_scanned += size
-            try:
-                raw = self._pm.read_bytes(base, size)
-            except Exception:
-                continue
-
-            for match in pattern.finditer(raw):
-                content_start = match.start()
-                remaining = len(raw) - content_start
-                chunk = raw[content_start:content_start + min(remaining, MAX_BUF_READ)]
-
-                if not chunk.startswith(MARKER_START):
-                    continue
-                marker_end = chunk.find(MARKER_END, len(MARKER_START))
-                if marker_end == -1:
-                    continue
-
-                content = chunk[len(MARKER_START):marker_end]
-                max_seq = _extract_max_seq(content)
-                if max_seq > best_seq:
-                    best_seq = max_seq
-                    best_addr = base + match.start()
+        heap_regions = [(b, s) for b, s in self._all_regions if s <= 8 * 1024 * 1024]
+        addr = _scan_regions_for_marker(self._pm, heap_regions, min_seq=min_seq)
 
         logger.debug(
-            "Heap scan: %d regions, %d MB, best_seq=%d",
-            regions_scanned, bytes_scanned // (1024 * 1024), best_seq,
+            "Heap scan: %d regions, best found=%s",
+            len(heap_regions), f"0x{addr:X}" if addr else "none",
         )
-        return best_addr
+        return addr
 
     # ------------------------------------------------------------------
     # Buffer reading and polling
@@ -657,8 +635,7 @@ class WoWAddonBufReader:
         Handles two staleness scenarios:
         1. Marker gone (read returns None) — string was GC'd → immediate rescan
         2. Frozen buffer — old Lua string still readable but outdated.
-           We do periodic region rescans (every 3s) to check if a newer
-           buffer with higher seq exists elsewhere in memory.
+           We do periodic rescans (every 2s) to check if a newer buffer exists.
         """
         if not self._pm or self._buf_addr == 0:
             return
@@ -684,9 +661,6 @@ class WoWAddonBufReader:
         self._deliver_new_messages(content)
 
         # Periodic rescan: check if a newer buffer exists.
-        # Old Lua strings stay readable after RebuildBuffer() — they're
-        # immutable, just waiting for GC. The new string (with higher seq)
-        # lives at a different address. We do a cheap region scan to find it.
         now = time.monotonic()
         if now - self._last_rescan >= self._rescan_interval:
             self._last_rescan = now
@@ -694,7 +668,7 @@ class WoWAddonBufReader:
 
     def _deliver_new_messages(self, content: str) -> None:
         """Parse buffer content and deliver messages with seq > last_seq."""
-        lines = [l.strip() for l in content.splitlines() if l.strip()]
+        lines = [line.strip() for line in content.splitlines() if line.strip()]
         if not lines:
             return
 
@@ -742,7 +716,10 @@ class WoWAddonBufReader:
                 try:
                     with open(RAW_LOG_FILE, "a", encoding="utf-8") as f:
                         t = time.localtime()
-                        ts = f"{t.tm_mon}/{t.tm_mday} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}.000"
+                        ts = (
+                            f"{t.tm_mon}/{t.tm_mday} "
+                            f"{t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}.000"
+                        )
                         f.write(f"[{ts}] #{seq} {payload}\n")
                 except OSError:
                     pass
