@@ -67,19 +67,28 @@ end
 local bufDirty = false
 
 local function RebuildBuffer()
-    -- Build buffer manually instead of table.concat: some entries may be
-    -- secret-tainted strings (from GetMessageInfo in instances).
-    -- table.concat fails on secret values, so we concat each entry
-    -- individually inside pcall, skipping any that are still tainted.
-    local parts = { "__WCT_BUF__" }
+    -- Build buffer via sequential string concat.
+    -- Some entries are secret-tainted (from GetMessageInfo in instances).
+    -- table.concat crashes on secrets; plain concat succeeds but propagates
+    -- taint to the result.  A tainted result string will then cause
+    -- table.concat to fail on subsequent operations.
+    --
+    -- Strategy: concat each entry one by one.  After each concat, verify
+    -- the result is not tainted by calling string.len() inside pcall.
+    -- string.len() crashes on secret strings but succeeds on normal ones.
+    -- If the result is tainted, discard it and keep the previous clean result.
+    local result = "__WCT_BUF__"
     for idx = 1, #wctBuf do
-        local ok, line = pcall(function() return wctBuf[idx] .. "" end)
-        if ok and line then
-            parts[#parts + 1] = line
+        local candidate = result .. "\n" .. wctBuf[idx]
+        -- Check if candidate is tainted: string.len raises on secrets
+        local ok = pcall(string.len, candidate)
+        if ok then
+            result = candidate
         end
+        -- If not ok: entry was secret, skip it silently
     end
-    parts[#parts + 1] = "__WCT_END__"
-    ChatTranslatorHelperDB.wctbuf = table.concat(parts, "\n")
+    result = result .. "\n__WCT_END__"
+    ChatTranslatorHelperDB.wctbuf = result
     bufDirty = false
 end
 
