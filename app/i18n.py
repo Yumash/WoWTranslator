@@ -247,6 +247,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "settings.tab.general": {"RU": "Основные", "EN": "General"},
     "settings.tab.overlay": {"RU": "Оверлей", "EN": "Overlay"},
     "settings.tab.hotkeys": {"RU": "Горячие клавиши", "EN": "Hotkeys"},
+    "settings.tab.about": {"RU": "О программе", "EN": "About"},
     "settings.save": {"RU": "Сохранить", "EN": "Save"},
 
     # General tab
@@ -437,6 +438,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "about.developer": {"RU": "Разработчик:", "EN": "Developer:"},
     "about.license": {"RU": "Лицензия: Apache-2.0", "EN": "License: Apache-2.0"},
     "about.close": {"RU": "Закрыть", "EN": "Close"},
+    "about.donate": {"RU": "Поддержать проект", "EN": "Support the project"},
     "overlay.session_start": {"RU": "новая сессия", "EN": "new session"},
 }
 

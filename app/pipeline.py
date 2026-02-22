@@ -260,15 +260,22 @@ class TranslationPipeline:
         # Detect language
         detected = self._detector.detect(cleaned_text)
         if detected is None:
-            # Own language or undetectable — emit without translation
-            logger.debug("No translation: own lang or undetectable for %r", cleaned_text[:60])
+            # Own language or skip-phrase — emit without translation
+            logger.info("Skip (own lang / skip-phrase): %r", cleaned_text[:60])
             self._on_message(TranslatedMessage(original=msg, translation=None))
             return
 
-        source_lang = _LINGUA_TO_DEEPL.get(detected, "")
-        if not source_lang:
-            self._on_message(TranslatedMessage(original=msg, translation=None))
-            return
+        # UNKNOWN = lingua couldn't determine, let DeepL auto-detect
+        if detected == ChatLanguageDetector.UNKNOWN:
+            source_lang = ""
+            logger.info("Translating (auto-detect)→%s: %r", target_lang, cleaned_text[:60])
+        else:
+            source_lang = _LINGUA_TO_DEEPL.get(detected, "")
+            if not source_lang:
+                logger.info("Skip (unmapped lang %s): %r", detected, cleaned_text[:60])
+                self._on_message(TranslatedMessage(original=msg, translation=None))
+                return
+            logger.info("Translating %s→%s: %r", source_lang, target_lang, cleaned_text[:60])
 
         # Check phrasebook (instant, no API call)
         phrasebook_hit = phrasebook_lookup(cleaned_text, source_lang, target_lang)
@@ -300,9 +307,21 @@ class TranslationPipeline:
         text_to_translate, replacements = strip_for_translation(cleaned_text)
 
         # Translate via API (this blocks — called from watchdog thread)
+        src_display = source_lang or "auto"
+        logger.info("Calling DeepL: %s→%s %r", src_display, target_lang, text_to_translate[:60])
         result = self._translator.translate(
-            text_to_translate, target_lang=target_lang, source_lang=source_lang,
+            text_to_translate, target_lang=target_lang,
+            source_lang=source_lang or None,
         )
+        translated_preview = result.translated[:60] if result.translated else ""
+        logger.info("DeepL result: success=%s, translated=%r", result.success, translated_preview)
+
+        # If DeepL auto-detected own language, skip (e.g. "zerg" detected as RU)
+        own_deepl = _LINGUA_TO_DEEPL.get(self._config.own_language, "")
+        if result.success and not source_lang and result.source_lang == own_deepl:
+            logger.info("DeepL detected own lang (%s), skipping: %r", own_deepl, cleaned_text[:60])
+            self._on_message(TranslatedMessage(original=msg, translation=None))
+            return
 
         # Restore preserved tokens in translated text
         if result.success and replacements:
@@ -313,9 +332,10 @@ class TranslationPipeline:
                 success=True,
             )
 
-        # Cache successful translations
+        # Cache successful translations (use DeepL-detected source if auto)
         if result.success:
-            self._cache.put(cleaned_text, source_lang, target_lang, result.translated)
+            cache_src = source_lang or result.source_lang
+            self._cache.put(cleaned_text, cache_src, target_lang, result.translated)
 
         self._on_message(TranslatedMessage(
             original=msg, translation=result, source_lang=source_lang,

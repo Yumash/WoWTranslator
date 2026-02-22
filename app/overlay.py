@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.about_dialog import VERSION
 from app.config import AppConfig
 from app.i18n import tr
 from app.parser import Channel
@@ -240,7 +241,7 @@ class ChatOverlay(QWidget):
 
         # Title bar
         title_bar = QHBoxLayout()
-        title_label = QLabel("WoWTranslator")
+        title_label = QLabel(f"WoWTranslator {VERSION}")
         title_label.setStyleSheet(
             "color: #FFD200; font-size: 11px; font-weight: bold; padding: 2px;"
         )

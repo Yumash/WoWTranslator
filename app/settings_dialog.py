@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.about_dialog import VERSION
 from app.config import AppConfig, detect_wow_path
 from app.i18n import UI_LANGUAGES, tr
 
@@ -390,6 +391,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._create_general_tab(), tr("settings.tab.general"))
         tabs.addTab(self._create_overlay_tab(), tr("settings.tab.overlay"))
         tabs.addTab(self._create_hotkeys_tab(), tr("settings.tab.hotkeys"))
+        tabs.addTab(self._create_about_tab(), tr("settings.tab.about"))
         layout.addWidget(tabs)
 
         # Buttons
@@ -713,6 +715,87 @@ class SettingsDialog(QDialog):
         hk_layout.addRow("", clipboard_hint)
 
         layout.addWidget(hk_group)
+        layout.addStretch()
+        return tab
+
+    # ── About Tab ────────────────────────────────────────────────
+
+    def _create_about_tab(self) -> QWidget:
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(12)
+
+        # Title + version
+        title = QLabel(f"WoWTranslator {VERSION}")
+        title.setStyleSheet("color: #FFD200; font-size: 18px; font-weight: bold;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        subtitle = QLabel(tr("about.subtitle"))
+        subtitle.setStyleSheet("color: #ccc; font-size: 12px;")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(subtitle)
+
+        # Developer
+        dev = QLabel(f"{tr('about.developer')} <b>Andrey Yumashev</b>")
+        dev.setStyleSheet("color: #ccc; font-size: 12px;")
+        dev.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(dev)
+
+        # License
+        lic = QLabel(tr("about.license"))
+        lic.setStyleSheet("color: #999; font-size: 11px;")
+        lic.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lic)
+
+        # GitHub
+        github = QLabel(
+            '<a href="https://github.com/Yumash/WoWTranslator" '
+            'style="color: #FFD200;">GitHub: Yumash/WoWTranslator</a>'
+        )
+        github.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        github.setOpenExternalLinks(True)
+        layout.addWidget(github)
+
+        # Separator
+        sep = QLabel()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet("background: #444;")
+        layout.addWidget(sep)
+
+        # Donate section
+        donate_title = QLabel(tr("about.donate"))
+        donate_title.setStyleSheet("color: #FFD200; font-size: 13px; font-weight: bold;")
+        donate_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(donate_title)
+
+        for label, addr in [
+            ("USDT TRC20", "TGaUz963ZaCoHrfoDDgy1sCvSrK1wsZvcx"),
+            ("BTC", "1BkYvFT8iBVG3GfTqkR2aBkABNkTrhYuja"),
+            ("TON", "UQDFaHBN1pcQZ7_9-w1E_hS_JNfGf3d0flS_467w7LOQ7xbK"),
+        ]:
+            row = QHBoxLayout()
+            crypto_label = QLabel(f"<b>{label}:</b>")
+            crypto_label.setStyleSheet("color: #ccc; font-size: 11px;")
+            crypto_label.setFixedWidth(90)
+            row.addWidget(crypto_label)
+
+            addr_field = QLineEdit(addr)
+            addr_field.setReadOnly(True)
+            addr_field.setStyleSheet(
+                "color: #e0e0e0; font-size: 10px; background: #111; "
+                "border: 1px solid #444; border-radius: 3px; padding: 4px;"
+            )
+            row.addWidget(addr_field)
+
+            copy_btn = QPushButton(tr("overlay.reply.copy"))
+            copy_btn.setFixedWidth(80)
+            copy_btn.clicked.connect(
+                lambda checked, a=addr: QApplication.clipboard().setText(a)
+            )
+            row.addWidget(copy_btn)
+            layout.addLayout(row)
+
         layout.addStretch()
         return tab
 

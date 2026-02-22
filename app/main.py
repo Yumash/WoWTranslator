@@ -23,11 +23,13 @@ from app.settings_dialog import SettingsDialog
 from app.translator import TranslatorService
 from app.tray import TrayIcon
 
+# Configure logging: file only at startup (no StreamHandler — console may not exist
+# in windowed exe). Console handler added later by _setup_console() if enabled.
+_LOG_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    format=_LOG_FMT,
     handlers=[
-        logging.StreamHandler(),
         logging.FileHandler("wct_app.log", encoding="utf-8", mode="w"),
     ],
 )
@@ -139,6 +141,7 @@ def _setup_console(visible: bool) -> None:
     When the .exe is built with console=False (windowed mode), there is no
     console by default.  AllocConsole() creates one on demand and we redirect
     stdout/stderr so that logging output appears there.
+    Also switches all logging to DEBUG level.
     """
     kernel32 = ctypes.windll.kernel32
     if visible:
@@ -146,6 +149,15 @@ def _setup_console(visible: bool) -> None:
         # Redirect Python stdout/stderr to the new console
         sys.stdout = open("CONOUT$", "w", encoding="utf-8")  # noqa: SIM115
         sys.stderr = open("CONOUT$", "w", encoding="utf-8")  # noqa: SIM115
+        # Add console stream handler (file handler was set up in basicConfig)
+        console_handler = logging.StreamHandler(sys.stderr)
+        console_handler.setFormatter(logging.Formatter(_LOG_FMT))
+        root = logging.getLogger()
+        root.addHandler(console_handler)
+        # Switch everything to DEBUG
+        root.setLevel(logging.DEBUG)
+        for h in root.handlers:
+            h.setLevel(logging.DEBUG)
     hwnd = kernel32.GetConsoleWindow()
     if hwnd:
         ctypes.windll.user32.ShowWindow(hwnd, 1 if visible else 0)

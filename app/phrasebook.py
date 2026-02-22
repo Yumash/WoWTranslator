@@ -274,6 +274,36 @@ _abbrev("nw", {
     "RU": "без проблем", "DE": "kein Problem",
     "FR": "pas de souci", "ES": "no hay problema"})
 
+# Common short words (too short for lingua or commonly auto-detected wrong)
+_abbrev("yes", {
+    "RU": "да", "DE": "ja", "FR": "oui", "ES": "sí"})
+_abbrev("yea", {
+    "RU": "да", "DE": "ja", "FR": "ouais", "ES": "sí"})
+_abbrev("yeah", {
+    "RU": "да", "DE": "ja", "FR": "ouais", "ES": "sí"})
+_abbrev("yep", {
+    "RU": "да", "DE": "jap", "FR": "ouais", "ES": "sip"})
+_abbrev("no", {
+    "RU": "нет", "DE": "nein", "FR": "non", "ES": "no"})
+_abbrev("nope", {
+    "RU": "неа", "DE": "nö", "FR": "nan", "ES": "nel"})
+
+# Summon requests (WoW convention: "123" = "summon me")
+_abbrev("123", {
+    "RU": "саммон", "EN": "summon",
+    "DE": "Beschwörung", "FR": "invocation", "ES": "invocar"})
+_abbrev("123 pls", {
+    "RU": "саммон пожалуйста", "EN": "summon please",
+    "DE": "Beschwörung bitte", "FR": "invocation svp",
+    "ES": "invocar por favor"})
+_abbrev("sum pls", {
+    "RU": "саммон пожалуйста", "EN": "summon please",
+    "DE": "Beschwörung bitte", "FR": "invocation svp",
+    "ES": "invocar por favor"})
+_abbrev("sum", {
+    "RU": "саммон", "EN": "summon",
+    "DE": "Beschwörung", "FR": "invocation", "ES": "invocar"})
+
 # fmt: on
 # ---------------------------------------------------------------------------
 # Public API

@@ -1,5 +1,14 @@
 # Changelog / История изменений
 
+## [1.0.1] — 2026-02-22
+
+### Fixed / Исправлено
+- Undetectable language now falls through to DeepL auto-detect instead of being skipped
+- Debug console now works correctly in windowed .exe (AllocConsole + CONOUT$ redirect)
+- Console hidden by default — enable via Settings → Overlay → "Show debug console"
+- Added INFO-level logging for translation pipeline steps (detect, skip, translate, DeepL result)
+- Fixed StreamHandler crash when sys.stderr is None in windowed exe
+
 ## [1.0.0] — 2026-02-22
 
 First public release.

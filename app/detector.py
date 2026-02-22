@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 _SKIP_PHRASES = frozenset({
     "kk", "ok", "lol", "lmao", "rip", "ez",
     "pst", "+", "++", "+++",
-    "1", "2", "3", "go", "pull", "cc", "aoe", "dps", "heal", "tank",
+    "1", "2", "3", "123", "go", "pull", "cc", "aoe", "dps", "heal", "tank",
     "res", "rez", "buff", "nerf", "proc", "crit", "dodge", "miss",
 })
 
@@ -45,6 +45,10 @@ def _cyrillic_ratio(text: str) -> float:
 class ChatLanguageDetector:
     """Detects language of chat messages, skipping gaming jargon."""
 
+    # Sentinel: lingua couldn't determine the language but text is not
+    # a skip-phrase and is long enough — pipeline should try DeepL anyway.
+    UNKNOWN = "UNKNOWN"
+
     def __init__(self, own_language: Language = Language.ENGLISH) -> None:
         self._own_language = own_language
         self._detector = (
@@ -67,14 +71,13 @@ class ChatLanguageDetector:
     def own_language(self, lang: Language) -> None:
         self._own_language = lang
 
-    def detect(self, text: str) -> Language | None:
+    def detect(self, text: str) -> Language | str | None:
         """Detect language of text.
 
-        Returns None if:
-        - text is too short
-        - text is a known gaming phrase
-        - confidence is too low (with Cyrillic fallback)
-        - detected language matches own_language
+        Returns:
+        - Language enum if detected with confidence
+        - UNKNOWN sentinel if lingua can't determine but text should be tried
+        - None if text is too short, a skip-phrase, or matches own_language
         """
         cleaned = text.strip().lower()
 
@@ -92,7 +95,7 @@ class ChatLanguageDetector:
 
         # Cyrillic fallback: if lingua can't decide but text is predominantly
         # Cyrillic, assume Russian. This helps with short slang like "мда",
-        # "щяс", "хуй там" that lingua fails to classify.
+        # "щяс" that lingua fails to classify.
         if detected is None:
             ratio = _cyrillic_ratio(text)
             if ratio >= _CYRILLIC_THRESHOLD:
@@ -103,7 +106,9 @@ class ChatLanguageDetector:
                 )
 
         if detected is None:
-            return None
+            # Lingua couldn't determine — let DeepL try
+            logger.debug("Undetectable, will try DeepL: %r", text[:40])
+            return self.UNKNOWN
 
         if detected == self._own_language:
             return None
