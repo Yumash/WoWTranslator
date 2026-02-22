@@ -228,7 +228,10 @@ def _strip_wow_markup(text: str) -> str:
 
 
 # Full WoW hyperlink pattern: |cXXXXXXXX|Htype:data|h[Display Name]|h|r
-_RE_WOW_LINK = re.compile(r"\|c[0-9a-fA-F]{8}\|H[^|]+\|h\[[^\]]*\]\|h\|r")
+# Also matches color-stripped variant: |Htype:data|h[Display Name]|h
+_RE_WOW_LINK = re.compile(
+    r"(?:\|c[0-9a-fA-F]{8})?\|H[^|]+\|h\[[^\]]*\]\|h(?:\|r)?"
+)
 
 
 def _is_item_link_only(raw_text: str) -> bool:

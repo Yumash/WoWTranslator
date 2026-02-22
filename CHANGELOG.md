@@ -6,6 +6,7 @@
 - Fixed garbled binary characters (null bytes, raw memory data) appearing in translated messages — GetMessageInfo() can return strings with embedded \x00 bytes from taint corruption; now truncated at first null byte in both addon and companion
 - Addon: pcall-wrapped string.find for null byte detection (safe on secret values)
 - Companion: defensive payload sanitization strips null bytes and trailing control characters
+- Parser: fixed `_is_item_link_only` to match color-stripped hyperlinks — item-link-only messages now correctly filtered
 
 ## [1.0.4] — 2026-02-22
 
