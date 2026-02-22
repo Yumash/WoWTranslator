@@ -1,5 +1,15 @@
 # Changelog / История изменений
 
+## [1.0.4] — 2026-02-22
+
+### Fixed / Исправлено
+- Addon: fixed `table.concat` crash on secret-tainted strings in RebuildBuffer — now pcall-filters each entry individually, skipping secret values
+- Addon: concatenation with secret string produces secret result — `wctSeq .. "|RAW|" .. text` stays tainted, now handled gracefully
+
+### Added / Добавлено
+- Phrasebook: "zug zug" (orc greeting), "zamn" (slang for damn)
+- Slang normalizer: "zamn" → "damn"
+
 ## [1.0.3] — 2026-02-22
 
 ### Fixed / Исправлено

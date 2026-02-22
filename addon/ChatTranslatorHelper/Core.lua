@@ -67,7 +67,19 @@ end
 local bufDirty = false
 
 local function RebuildBuffer()
-    ChatTranslatorHelperDB.wctbuf = "__WCT_BUF__" .. table.concat(wctBuf, "\n") .. "\n__WCT_END__"
+    -- Build buffer manually instead of table.concat: some entries may be
+    -- secret-tainted strings (from GetMessageInfo in instances).
+    -- table.concat fails on secret values, so we concat each entry
+    -- individually inside pcall, skipping any that are still tainted.
+    local parts = { "__WCT_BUF__" }
+    for idx = 1, #wctBuf do
+        local ok, line = pcall(function() return wctBuf[idx] .. "" end)
+        if ok and line then
+            parts[#parts + 1] = line
+        end
+    end
+    parts[#parts + 1] = "__WCT_END__"
+    ChatTranslatorHelperDB.wctbuf = table.concat(parts, "\n")
     bufDirty = false
 end
 

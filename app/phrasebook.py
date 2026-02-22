@@ -407,6 +407,14 @@ _abbrev("gotta go", {
     "RU": "мне пора", "EN": "gotta go",
     "DE": "muss los", "FR": "je dois y aller",
     "ES": "me tengo que ir"})
+_abbrev("zug zug", {
+    "RU": "зуг зуг (да, сэр)", "EN": "zug zug (yes, sir)",
+    "DE": "Zug Zug (jawohl)", "FR": "zug zug (oui chef)",
+    "ES": "zug zug (sí, señor)"})
+_abbrev("zamn", {
+    "RU": "ого", "EN": "damn",
+    "DE": "verdammt", "FR": "la vache",
+    "ES": "caramba"})
 
 # fmt: on
 # ---------------------------------------------------------------------------

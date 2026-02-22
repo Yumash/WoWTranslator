@@ -43,6 +43,8 @@ _WORD_MAP: dict[str, str] = {
     "lust": "bloodlust",
     "bl": "bloodlust",
     "hero": "heroism",
+    # Exclamations
+    "zamn": "damn",
     # Misc
     "alr": "already",
     "rn": "right now",
