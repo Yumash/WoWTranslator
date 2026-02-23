@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Build
+build/
+dist/
+
+# Runtime
+config.json
+*.log
+*.db
+.env
+overlay_settings.json
+settings_dialog_pos.json

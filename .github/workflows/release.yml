@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build .exe
+        run: pyinstaller build.spec
+
+      - name: Package
+        run: |
+          Compress-Archive -Path dist\WoWTranslator.exe -DestinationPath dist\WoWTranslator.zip
+
+      - name: Compute checksum
+        run: |
+          $hash = (Get-FileHash dist\WoWTranslator.zip -Algorithm SHA256).Hash
+          "$hash  WoWTranslator.zip" | Out-File dist\checksums.txt -Encoding utf8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package
+          path: |
+            dist/WoWTranslator.zip
+            dist/checksums.txt
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package
+          path: release/
+
+      - name: Extract changelog
+        id: changelog
+        run: |
+          # Extract the latest version section from CHANGELOG.md
+          awk '/^## \[/{if(found) exit; found=1; next} found{print}' CHANGELOG.md > release_notes.md
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Determine tag
+        id: tag
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: WoWTranslator ${{ steps.tag.outputs.tag }}
+          body: ${{ steps.changelog.outputs.notes }}
+          files: |
+            release/WoWTranslator.zip
+            release/checksums.txt
+          draft: false
+          prerelease: false
