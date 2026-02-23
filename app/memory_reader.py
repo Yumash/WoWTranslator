@@ -59,6 +59,9 @@ _READABLE_PROTECT = {
 # Region history size — how many past marker regions to remember
 _REGION_HISTORY_SIZE = 16
 
+# Adaptive rescan intervals: ramp up when idle, reset on new messages
+_RESCAN_INTERVALS = [2.0, 5.0, 10.0, 30.0]
+
 # Compiled marker pattern (reused across scans)
 _MARKER_PATTERN = re.compile(re.escape(MARKER_START))
 
@@ -201,8 +204,13 @@ class WoWAddonBufReader:
         # is much faster than scanning all regions.
         self._region_history: list[tuple[int, int]] = []
 
-        # Track consecutive stale reads to trigger rescan
+        # Track consecutive stale reads to trigger rescan (with backoff)
         self._stale_count: int = 0
+        self._stale_tier: int = 0  # exponential backoff tier for marker-gone
+
+        # Seq reset guard: remember recent message texts to avoid re-delivery
+        self._pre_reset_texts: set[str] = set()
+        self._pre_reset_expire: float = 0.0
 
         # Periodic rescan: check if a newer buffer exists every N seconds.
         self._last_rescan: float = 0.0
@@ -558,8 +566,8 @@ class WoWAddonBufReader:
         if self._region_history:
             new_addr = _scan_regions_for_marker(self._pm, self._region_history)
 
-        if not new_addr or new_addr == self._buf_addr:
-            # History missed or same addr — try heap scan
+        if not new_addr:
+            # History missed entirely — try heap scan
             self._all_regions = self._get_memory_regions()
             new_addr = self._scan_heap_regions()
             scan_type = "heap"
@@ -573,14 +581,20 @@ class WoWAddonBufReader:
             )
             self._buf_addr = new_addr
             self._stale_count = 0
+            self._stale_tier = 0
             self._same_addr_count = 0
+            self._rescan_interval = _RESCAN_INTERVALS[0]
             self._record_hit_from_addr(new_addr)
         else:
             self._same_addr_count += 1
+            # Adaptive: ramp up rescan interval when idle
+            tier = min(self._same_addr_count // 3, len(_RESCAN_INTERVALS) - 1)
+            self._rescan_interval = _RESCAN_INTERVALS[tier]
             if self._same_addr_count <= 3 or self._same_addr_count % 10 == 0:
                 logger.info(
-                    "Periodic rescan #%d: same buffer (%s, %.0fms)",
+                    "Periodic rescan #%d: same buffer (%s, %.0fms, next in %.0fs)",
                     self._same_addr_count, scan_type, elapsed * 1000,
+                    self._rescan_interval,
                 )
 
     def _scan_heap_regions(self, min_seq: int = 0) -> int:
@@ -644,11 +658,17 @@ class WoWAddonBufReader:
         if content is None:
             # Marker stale — string was GC'd or memory changed
             self._stale_count += 1
-            if self._stale_count >= 2:
-                logger.info(
-                    "Marker gone (count=%d), triggering rescan",
-                    self._stale_count,
-                )
+            # Exponential backoff: threshold doubles each tier (2→4→8→16)
+            stale_threshold = min(2 << self._stale_tier, 16)
+            if self._stale_count >= stale_threshold:
+                if self._stale_tier == 0:
+                    logger.info("Marker gone, triggering rescan (tier 0)")
+                else:
+                    logger.debug(
+                        "Marker still gone (tier=%d, count=%d), rescan",
+                        self._stale_tier, self._stale_count,
+                    )
+                self._stale_tier += 1
                 self._buf_addr = 0
                 self._stale_count = 0
             return
@@ -658,6 +678,7 @@ class WoWAddonBufReader:
             return
 
         self._stale_count = 0
+        self._stale_tier = 0
         self._deliver_new_messages(content)
 
         # Periodic rescan: check if a newer buffer exists.
@@ -686,9 +707,16 @@ class WoWAddonBufReader:
 
         if max_seq_in_buf > 0 and max_seq_in_buf < self._last_seq:
             logger.info(
-                "Seq reset detected (buf max=%d, last_seq=%d) — resetting tracker",
+                "Seq reset detected (buf max=%d, last_seq=%d) — saving texts & resetting",
                 max_seq_in_buf, self._last_seq,
             )
+            # Save recent message texts to avoid re-delivering after reset
+            self._pre_reset_texts = set()
+            for ln in lines:
+                prt = ln.split("|", 2)
+                if len(prt) >= 3:
+                    self._pre_reset_texts.add(prt[2][:200])
+            self._pre_reset_expire = time.monotonic() + 60.0
             self._last_seq = 0
 
         new_count = 0
@@ -706,10 +734,16 @@ class WoWAddonBufReader:
                 continue
 
             self._last_seq = seq
-            new_count += 1
 
             kind = parts[1]
             payload = parts[2]
+
+            # Seq reset guard: skip messages we already delivered before reset
+            if self._pre_reset_texts and payload[:200] in self._pre_reset_texts:
+                logger.debug("Seq reset dedup: skipping #%d (already delivered)", seq)
+                continue
+
+            new_count += 1
 
             # Sanitize: Lua strings may contain embedded \x00 bytes from
             # taint-corrupted GetMessageInfo() results.  Truncate at first
@@ -756,8 +790,16 @@ class WoWAddonBufReader:
                         logger.debug("Addon msg #%d: %s", seq, log_line[:80])
                         self._on_new_line(log_line)
 
+        # Expire pre-reset dedup set
+        if self._pre_reset_texts and time.monotonic() > self._pre_reset_expire:
+            logger.debug("Pre-reset dedup set expired (%d entries)", len(self._pre_reset_texts))
+            self._pre_reset_texts.clear()
+
         if new_count > 0:
             logger.info("Delivered %d new messages (last_seq=%d)", new_count, self._last_seq)
+            # Reset rescan to fast mode when messages are flowing
+            self._rescan_interval = 2.0
+            self._same_addr_count = 0
 
     @staticmethod
     def _make_synthetic_log_line(channel: str, author: str, text: str) -> str | None:

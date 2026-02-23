@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 
 from app.i18n import tr
 
-VERSION = "1.0.6"
+VERSION = "1.0.7"
 
 ABOUT_STYLESHEET = """
 QDialog {
@@ -64,7 +64,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(tr("about.title"))
-        self.setFixedSize(420, 380)
+        self.setFixedSize(420, 410)
         self.setStyleSheet(ABOUT_STYLESHEET)
 
         # Window icon — load from .ico, fallback to programmatic
@@ -135,6 +135,12 @@ class AboutDialog(QDialog):
         license_label = QLabel(tr("about.license"))
         license_label.setStyleSheet("color: #999; font-size: 11px;")
         layout.addWidget(license_label)
+
+        # Glossary credit
+        glossary_label = QLabel(tr("about.glossary_credit"))
+        glossary_label.setStyleSheet("color: #999; font-size: 11px;")
+        glossary_label.setOpenExternalLinks(True)
+        layout.addWidget(glossary_label)
 
         # Links
         links_sep = QLabel()

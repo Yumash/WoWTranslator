@@ -29,6 +29,45 @@ from app.translator import TranslatorService
 
 logger = logging.getLogger(__name__)
 
+
+class _ResizeGrip(QLabel):
+    """Draggable resize grip for bottom-right corner of overlay."""
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__("\u2921", parent)
+        self._overlay = parent
+        self._drag_pos: QPoint | None = None
+        self.setFixedSize(20, 20)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setStyleSheet(
+            "color: #555; font-size: 14px; background: transparent;"
+        )
+        self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
+        self.setToolTip("Resize")
+
+    def mousePressEvent(self, event: object) -> None:
+        if hasattr(event, 'button') and event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint()
+
+    def mouseMoveEvent(self, event: object) -> None:
+        if self._drag_pos is None:
+            return
+        gpos = event.globalPosition().toPoint()
+        dx = gpos.x() - self._drag_pos.x()
+        dy = gpos.y() - self._drag_pos.y()
+        geo = self._overlay.geometry()
+        min_w = self._overlay.minimumWidth()
+        min_h = self._overlay.minimumHeight()
+        geo.setWidth(max(min_w, geo.width() + dx))
+        geo.setHeight(max(min_h, geo.height() + dy))
+        self._overlay.setGeometry(geo)
+        self._drag_pos = gpos
+
+    def mouseReleaseEvent(self, event: object) -> None:
+        self._drag_pos = None
+        if hasattr(self._overlay, '_save_overlay_state'):
+            self._overlay._save_overlay_state()
+
 # WoW channel colors
 CHANNEL_COLORS: dict[Channel, str] = {
     Channel.SAY: "#FFFFFF",
@@ -225,13 +264,14 @@ class ChatOverlay(QWidget):
     def _setup_ui(self) -> None:
         """Build the overlay UI."""
         layout = QVBoxLayout(self)
-        # Outer margins create transparent grip area for resize
-        layout.setContentsMargins(4, 4, 4, 4)
+        # Outer margins create transparent grip area matching _EDGE_MARGIN
+        layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(0)
         self.setMouseTracking(True)
 
         # Main container with WoW-dark background
         self._container = QWidget()
+        self._container.setMouseTracking(True)
         self._container.setStyleSheet(
             "background: rgba(0, 0, 0, 180); border-radius: 4px;"
         )
@@ -456,13 +496,7 @@ class ChatOverlay(QWidget):
         grip_row = QHBoxLayout()
         grip_row.setContentsMargins(0, 0, 0, 0)
         grip_row.addStretch()
-        self._resize_grip = QLabel("\u2921")
-        self._resize_grip.setFixedSize(16, 16)
-        self._resize_grip.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._resize_grip.setStyleSheet(
-            "color: #555; font-size: 12px; background: transparent;"
-        )
-        self._resize_grip.setToolTip("Resize")
+        self._resize_grip = _ResizeGrip(self)
         grip_row.addWidget(self._resize_grip)
         container_layout.addLayout(grip_row)
 

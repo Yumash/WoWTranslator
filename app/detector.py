@@ -29,6 +29,10 @@ _SHORT_TEXT_THRESHOLD = 20
 # assume Russian (the dominant Cyrillic language in WoW).
 _CYRILLIC_THRESHOLD = 0.5
 
+# Cyrillic sibling languages: lingua often confuses short Russian text
+# with Bulgarian or Ukrainian. On RU servers 99%+ Cyrillic is Russian.
+_CYRILLIC_SIBLING_LANGUAGES = frozenset({Language.BULGARIAN, Language.UKRAINIAN})
+
 
 def _cyrillic_ratio(text: str) -> float:
     """Return fraction of alphabetic characters that are Cyrillic."""
@@ -111,6 +115,18 @@ class ChatLanguageDetector:
             return self.UNKNOWN
 
         if detected == self._own_language:
+            return None
+
+        # Short Cyrillic text often misdetected as BG/UK — treat as own lang
+        if (
+            detected in _CYRILLIC_SIBLING_LANGUAGES
+            and self._own_language == Language.RUSSIAN
+            and _cyrillic_ratio(text) >= _CYRILLIC_THRESHOLD
+        ):
+            logger.debug(
+                "Cyrillic sibling %s -> treating as RU: %r",
+                detected, text[:40],
+            )
             return None
 
         return detected

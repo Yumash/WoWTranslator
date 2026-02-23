@@ -17,6 +17,7 @@ from app.detector import ChatLanguageDetector
 from app.parser import Channel, ChatMessage, parse_line
 from app.phrasebook import lookup as phrasebook_lookup
 from app.phrasebook import lookup_abbreviation as phrasebook_abbrev
+from app.glossary import expand_wow_terms
 from app.slang import expand_slang
 from app.text_utils import (
     clean_message_text,
@@ -227,6 +228,12 @@ class TranslationPipeline:
             logger.debug("Channel %s not enabled", msg.channel)
             return
 
+        # NPC filter: NPC names contain spaces (e.g. "High King Anduin"),
+        # player names never do. Only applies to Say/Yell channels.
+        if msg.channel in (Channel.SAY, Channel.YELL) and " " in msg.author:
+            logger.debug("NPC message filtered: %s", msg.author[:40])
+            return
+
         # Own messages — show in overlay but never translate
         if self._config.own_character and msg.author == self._config.own_character:
             self._on_message(TranslatedMessage(original=msg, translation=None))
@@ -319,6 +326,12 @@ class TranslationPipeline:
         if expanded != text_to_translate:
             logger.info("Slang expanded: %r → %r", text_to_translate[:60], expanded[:60])
             text_to_translate = expanded
+
+        # Expand WoW-specific terms (context-gated: 2+ gaming terms required)
+        wow_expanded = expand_wow_terms(text_to_translate)
+        if wow_expanded != text_to_translate:
+            logger.info("WoW terms expanded: %r → %r", text_to_translate[:60], wow_expanded[:60])
+            text_to_translate = wow_expanded
 
         # Translate via API (this blocks — called from watchdog thread)
         src_display = source_lang or "auto"

@@ -295,6 +295,10 @@ ruff check app/ tests/
 pyinstaller build.spec
 ```
 
+## Благодарности
+
+- **[WoW Translator](https://www.curseforge.com/wow/addons/wow-translator)** от **Pirson** — глоссарий WoW-терминов и аббревиатур на 11 языках. Встроенный разговорник WoWTranslator включает словарные данные из этого аддона.
+
 ## Авторы
 
 - **Andrey Yumashev** — [@Yumash](https://github.com/Yumash)

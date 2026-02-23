@@ -108,6 +108,8 @@ _add({"EN": "need help", "RU": "нужна помощь",
       "ES": "necesito ayuda"})
 _add({"EN": "come here", "RU": "иди сюда",
       "DE": "komm her", "FR": "viens ici", "ES": "ven aquí"})
+_add({"EN": "go", "RU": "вперёд",
+      "DE": "los", "FR": "go", "ES": "vamos"})
 _add({"EN": "let's go", "RU": "погнали",
       "DE": "los geht's", "FR": "allons-y", "ES": "vamos"})
 _add({"EN": "run", "RU": "бегите",
@@ -417,6 +419,27 @@ _abbrev("zamn", {
     "ES": "caramba"})
 
 # fmt: on
+
+# ---------------------------------------------------------------------------
+# Merge glossary abbreviations (Pirson's WoW Translator).
+# Our entries have priority — glossary only fills gaps.
+# ---------------------------------------------------------------------------
+try:
+    from app.glossary_data import SAFE_ABBREVIATIONS as _GLOSSARY_ABBREVS
+
+    _glossary_added = 0
+    for _key, _translations in _GLOSSARY_ABBREVS.items():
+        _norm = _normalize(_key)
+        for _lang, _text in _translations.items():
+            _lang_upper = _lang.upper()
+            if (_norm, _lang_upper) not in _ABBREVIATIONS:
+                _ABBREVIATIONS[(_norm, _lang_upper)] = _text
+                _glossary_added += 1
+    logger.debug("Merged %d glossary abbreviations", _glossary_added)
+    del _GLOSSARY_ABBREVS, _glossary_added, _key, _translations, _norm, _lang, _text, _lang_upper
+except ImportError:
+    pass
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------

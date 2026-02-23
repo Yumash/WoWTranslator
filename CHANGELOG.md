@@ -1,5 +1,24 @@
 # Changelog / История изменений
 
+## [1.0.7] — 2026-02-23
+
+### Added / Добавлено
+- WoW glossary: 80 safe abbreviations (9 languages) from Pirson's WoW Translator addon — instant translation of terms like aoe, dk, ilvl, gz, cc without API call
+- Context-gated term expansion: 102 WoW-specific terms (dungeon names, specs, roles) expanded to plain English before DeepL when 2+ gaming terms detected in message
+- Safety set: ~40 common English words (add, hit, focus, fire, arms, etc.) excluded from expansion to prevent false positives
+
+### Fixed / Исправлено
+- Overlay resize grip now works — bottom-right corner ⇡ icon is a real drag handle
+- Reply translator defaults to → EN when own language is RU (was incorrectly set to → RU)
+- "go?" no longer mistranslated by DeepL — added to phrasebook as "вперёд"
+
+### Improved / Улучшено
+- Memory reader: seq reset guard — prevents re-translation of already-seen messages after addon /reload (saves DeepL API quota)
+- Memory reader: exponential backoff for marker-gone detection (2→4→8→16 stale reads before rescan instead of fixed 2)
+- Memory reader: adaptive rescan interval (2s→5s→10s→30s) when buffer address is stable, resets to 2s on new messages
+- Language detector: short Cyrillic text misdetected as Bulgarian/Ukrainian now treated as Russian (for RU users)
+- NPC filter: Say/Yell messages from NPC names (containing spaces) are now filtered from overlay
+
 ## [1.0.6] — 2026-02-23
 
 ### Fixed / Исправлено

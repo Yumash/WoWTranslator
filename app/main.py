@@ -203,9 +203,11 @@ def main() -> int:
     overlay = ChatOverlay(config)
     overlay.update_channel_filters(_enabled_filter_names(config))
 
-    # Provide translator for the reply panel
+    # Provide translator for the reply panel.
+    # Reply translates outgoing messages — default to EN unless own language is EN.
     reply_translator = TranslatorService(api_key=config.deepl_api_key)
-    overlay.set_translator(reply_translator, config.target_language)
+    reply_lang = "EN" if config.own_language != "EN" else config.target_language
+    overlay.set_translator(reply_translator, reply_lang)
 
     overlay.show()
 

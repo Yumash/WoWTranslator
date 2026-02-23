@@ -437,6 +437,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     },
     "about.developer": {"RU": "Разработчик:", "EN": "Developer:"},
     "about.license": {"RU": "Лицензия: Apache-2.0", "EN": "License: Apache-2.0"},
+    "about.glossary_credit": {
+        "RU": 'Глоссарий терминов: <a href="https://www.curseforge.com/wow/addons/wow-translator" style="color: #FFD200;">WoW Translator</a> by Pirson',
+        "EN": 'Term glossary: <a href="https://www.curseforge.com/wow/addons/wow-translator" style="color: #FFD200;">WoW Translator</a> by Pirson',
+    },
     "about.close": {"RU": "Закрыть", "EN": "Close"},
     "about.donate": {"RU": "Поддержать проект", "EN": "Support the project"},
     "overlay.session_start": {"RU": "новая сессия", "EN": "new session"},
