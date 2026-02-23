@@ -1,5 +1,11 @@
 # Changelog / История изменений
 
+## [1.0.6] — 2026-02-23
+
+### Fixed / Исправлено
+- Fixed duplicate messages flooding overlay — file watcher no longer runs alongside memory reader; WoW buffers chatlog writes for minutes then flushes a huge batch that bypassed dedup TTL
+- File watcher now only activates as fallback when memory reader is unavailable (no pymem, no admin rights, WoW not running)
+
 ## [1.0.5] — 2026-02-23
 
 ### Fixed / Исправлено

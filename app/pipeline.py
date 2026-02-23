@@ -172,28 +172,28 @@ class TranslationPipeline:
         """Start watching the chat log and translating.
 
         Tries memory reader first for real-time delivery.
-        Always starts file watcher as fallback (catches messages
-        memory reader might miss, provides history support).
+        File watcher only starts as fallback when memory reader is unavailable.
+        Running both causes duplicate messages (WoW buffers chatlog writes
+        for minutes, then flushes a huge batch that bypasses dedup TTL).
         """
-        # Always start file watcher (for history + fallback)
-        self._watcher.start()
-
-        # Try memory reader for real-time delivery
+        # Try memory reader first (real-time, preferred)
         if self._memory_watcher:
             try:
                 self._memory_watcher.start()
-                logger.info("Pipeline started (memory reader + file watcher)")
+                logger.info("Pipeline started (memory reader only)")
+                return
             except Exception as e:
                 logger.warning("Memory reader failed to start: %s", e)
-                logger.info("Pipeline started (file watcher only)")
-        else:
-            logger.info("Pipeline started (file watcher only)")
+
+        # Fallback: file watcher only
+        self._watcher.start()
+        logger.info("Pipeline started (file watcher only)")
 
     def stop(self) -> None:
         """Stop the pipeline."""
         if self._memory_watcher:
             self._memory_watcher.stop()
-        self._watcher.stop()
+        self._watcher.stop()  # safe even if not started
         self._cache.close()
         logger.info("Pipeline stopped")
 
