@@ -19,10 +19,6 @@
   <a href="https://github.com/Yumash/WoWTranslator/releases"><img src="https://img.shields.io/github/v/release/Yumash/WoWTranslator" alt="Release" /></a>
 </p>
 
-<p align="center">
-  <a href="README.en.md">English version</a>
-</p>
-
 ---
 
 ## Что это?
@@ -307,16 +303,6 @@ pyinstaller build.spec
 
 - **Andrey Yumashev** — [@Yumash](https://github.com/Yumash)
 - **Claude** (Anthropic) — AI-соавтор
-
-## Поддержать проект
-
-Если WoWTranslator делает ваш мультиязычный опыт в WoW лучше, поддержите разработку:
-
-| Криптовалюта | Адрес |
-|---|---|
-| **USDT TRC20 (ByBit)** | `TGaUz963ZaCoHrfoDDgy1sCvSrK1wsZvcx` |
-| **BTC (ByBit)** | `1BkYvFT8iBVG3GfTqkR2aBkABNkTrhYuja` |
-| **TON** | `UQDFaHBN1pcQZ7_9-w1E_hS_JNfGf3d0flS_467w7LOQ7xbK` |
 
 ## Лицензия
 

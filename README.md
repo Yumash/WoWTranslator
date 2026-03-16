@@ -19,10 +19,6 @@
   <a href="https://github.com/Yumash/WoWTranslator/releases"><img src="https://img.shields.io/github/v/release/Yumash/WoWTranslator" alt="Release" /></a>
 </p>
 
-<p align="center">
-  <a href="README.md">Русская версия</a>
-</p>
-
 ---
 
 ## What Is This?
@@ -299,20 +295,14 @@ ruff check app/ tests/
 pyinstaller build.spec
 ```
 
+## Acknowledgements
+
+- **[WoW Translator](https://www.curseforge.com/wow/addons/wow-translator)** by **Pirson** — WoW glossary of terms and abbreviations in 11 languages. WoWTranslator's built-in glossary includes dictionary data from this addon.
+
 ## Authors
 
 - **Andrey Yumashev** — [@Yumash](https://github.com/Yumash)
 - **Claude** (Anthropic) — AI co-author
-
-## Support the Project
-
-If WoWTranslator makes your multilingual WoW experience better, consider supporting its development:
-
-| Cryptocurrency | Address |
-|---|---|
-| **USDT TRC20 (ByBit)** | `TGaUz963ZaCoHrfoDDgy1sCvSrK1wsZvcx` |
-| **BTC (ByBit)** | `1BkYvFT8iBVG3GfTqkR2aBkABNkTrhYuja` |
-| **TON** | `UQDFaHBN1pcQZ7_9-w1E_hS_JNfGf3d0flS_467w7LOQ7xbK` |
 
 ## License
 
