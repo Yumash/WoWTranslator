@@ -17,7 +17,14 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" /></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.12+-yellow.svg" alt="Python" /></a>
-  <a href="https://github.com/Yumash/BabelChat/releases"><img src="https://img.shields.io/github/v/release/Yumash/BabelChat" alt="Release" /></a>
+  <a href="https://github.com/Yumash/BabelChat/releases"><img src="https://img.shields.io/github/v/release/Yumash/BabelChat?include_prereleases" alt="Release" /></a>
+</p>
+
+<p align="center">
+  <b>Поддержать авторов:</b><br>
+  <a href="https://buymeacoffee.com/franciscorb"><img src="https://img.shields.io/badge/Pirson_(Словарь)-Buy_Me_a_Coffee-yellow?logo=buymeacoffee" alt="Buy Me a Coffee" /></a>
+  &nbsp;
+  <code>USDT TRC20: TGaUz963ZaCoHrfoDDgy1sCvSrK1wsZvcx</code> (Andrey — Приложение)
 </p>
 
 ---
