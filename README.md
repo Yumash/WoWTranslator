@@ -23,7 +23,7 @@
 <p align="center">
   <a href="https://buymeacoffee.com/franciscorb"><img src="https://img.shields.io/badge/Pirson_(Dictionary)-Buy_Me_a_Coffee-yellow?style=for-the-badge&logo=buymeacoffee&logoColor=white" alt="Buy Me a Coffee" /></a>
   &nbsp;
-  <a href="https://yumatech.ru/donate/"><img src="https://img.shields.io/badge/Andrey_(App)-Donate-blue?style=for-the-badge&logo=tether&logoColor=white" alt="Donate" /></a>
+  <a href="https://yumatech.ru/donate/"><img src="https://img.shields.io/badge/Donate-USDT%20%7C%20OpenCollective-blue?style=for-the-badge&logo=tether&logoColor=white" alt="Donate" /></a>
 </p>
 
 ---
