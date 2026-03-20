@@ -21,10 +21,9 @@
 </p>
 
 <p align="center">
-  <b>Support the authors:</b><br>
-  <a href="https://buymeacoffee.com/franciscorb"><img src="https://img.shields.io/badge/Pirson_(Dictionary)-Buy_Me_a_Coffee-yellow?logo=buymeacoffee" alt="Buy Me a Coffee" /></a>
+  <a href="https://buymeacoffee.com/franciscorb"><img src="https://img.shields.io/badge/Pirson_(Dictionary)-Buy_Me_a_Coffee-yellow?style=for-the-badge&logo=buymeacoffee&logoColor=white" alt="Buy Me a Coffee" /></a>
   &nbsp;
-  <code>USDT TRC20: TGaUz963ZaCoHrfoDDgy1sCvSrK1wsZvcx</code> (Andrey — Companion App)
+  <a href="https://yumatech.ru/donate/"><img src="https://img.shields.io/badge/Andrey_(App)-Donate-blue?style=for-the-badge&logo=tether&logoColor=white" alt="Donate" /></a>
 </p>
 
 ---
@@ -220,7 +219,7 @@ This project is a collaboration between two authors:
 | Component | Author | Support |
 |-----------|--------|---------|
 | **WoW Glossary** — 314 terms in 14 languages, in-game dictionary idea | **Pirson** | [Buy Me a Coffee](https://buymeacoffee.com/franciscorb) |
-| **Companion App** — overlay, DeepL translation, memory reader, streaming | **Andrey Yumashev** | USDT TRC20: `TGaUz963ZaCoHrfoDDgy1sCvSrK1wsZvcx` |
+| **Companion App** — overlay, DeepL translation, memory reader, streaming | **Andrey Yumashev** | [Donate](https://yumatech.ru/donate/) |
 
 ## Documentation
 

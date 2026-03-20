@@ -21,10 +21,9 @@
 </p>
 
 <p align="center">
-  <b>Поддержать авторов:</b><br>
-  <a href="https://buymeacoffee.com/franciscorb"><img src="https://img.shields.io/badge/Pirson_(Словарь)-Buy_Me_a_Coffee-yellow?logo=buymeacoffee" alt="Buy Me a Coffee" /></a>
+  <a href="https://buymeacoffee.com/franciscorb"><img src="https://img.shields.io/badge/Pirson_(Словарь)-Buy_Me_a_Coffee-yellow?style=for-the-badge&logo=buymeacoffee&logoColor=white" alt="Buy Me a Coffee" /></a>
   &nbsp;
-  <code>USDT TRC20: TGaUz963ZaCoHrfoDDgy1sCvSrK1wsZvcx</code> (Andrey — Приложение)
+  <a href="https://yumatech.ru/donate/"><img src="https://img.shields.io/badge/Andrey_(Приложение)-Donate-blue?style=for-the-badge&logo=tether&logoColor=white" alt="Donate" /></a>
 </p>
 
 ---
@@ -198,7 +197,7 @@ BabelChat включает словарь **314 игровых терминов*
 | Компонент | Автор | Поддержать |
 |-----------|-------|------------|
 | **Словарь WoW** — 314 терминов на 14 языках, идея внутриигрового перевода | **Pirson** | [Buy Me a Coffee](https://buymeacoffee.com/franciscorb) |
-| **Приложение-компаньон** — оверлей, перевод DeepL, чтение памяти, стриминг | **Andrey Yumashev** | USDT TRC20: `TGaUz963ZaCoHrfoDDgy1sCvSrK1wsZvcx` |
+| **Приложение-компаньон** — оверлей, перевод DeepL, чтение памяти, стриминг | **Andrey Yumashev** | [Donate](https://yumatech.ru/donate/) |
 
 ## Документация
 
