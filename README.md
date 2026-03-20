@@ -28,6 +28,12 @@
 
 ---
 
+<p align="center">
+  <img src="assets/demo.gif" alt="BabelChat Demo" width="700" />
+  <br>
+  <a href="assets/demo.mp4">Watch full demo (43s)</a>
+</p>
+
 ## The Problem
 
 You join a PUG raid. The tank explains tactics — in Spanish. The healer asks something — in German. You speak English (or Russian, or French). Nobody understands each other. The pull happens, people die, and someone types "gg noob" — the only phrase everyone knows.

@@ -28,6 +28,12 @@
 
 ---
 
+<p align="center">
+  <img src="assets/demo.gif" alt="BabelChat Demo" width="700" />
+  <br>
+  <a href="assets/demo.mp4">Ver demo completo (43s)</a>
+</p>
+
 ## El Problema
 
 Entras a una banda PUG. El tanque explica tácticas — en ruso. El sanador pregunta algo — en alemán. Tú hablas español. Nadie se entiende. Comienza el pull, la gente muere, y alguien escribe "gg noob" — la única frase que todos conocen.
